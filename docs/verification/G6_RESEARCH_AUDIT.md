@@ -3,7 +3,7 @@
 **Audit date:** 18 November 2026  
 **Repository:** msellamiTN/UCON-JEPA  
 **Audited branch:** main  
-**Status:** research workflow applied; two-pass full CI passed; stricter three-pass CI pending
+**Status:** research workflow applied; three-pass full CI passed; explicit theorem-premise revalidation pending
 
 ## 1. Workflow availability and application
 
@@ -63,7 +63,7 @@ This result applies only to the finite abstract synchronous-acceptance model and
 
 ### 3.3 Full repository CI
 
-Full repository run 44200176395 on commit 15e137c47471ee5d93d9311a1cb33ce039997a29 passed all three jobs: G5 Python tests, G6 runtime contract tests, and LaTeX builds for G4, G6, and G5. The G6 PDF was produced as a 10-page document. The two-pass LaTeX run showed first-pass reference warnings for G4/G5; the second pass removed the undefined-reference warnings, although a label-changed warning remained. To tighten the gate, commit 868e4ca113aec3a0007e0dc44e4c16d76f62784a changed CI to three passes and explicit unresolved-reference detection. The latest theorem-assumption edits are in commit 899baac89f748ff8ba01ec2aa5c65e23405d1f9a. Workflow run 44200529810 is currently validating that latest source and stricter gate; its Python jobs have passed and the LaTeX job is still installing TeX Live.
+Full repository run 44200430951 on commit 868e4ca113aec3a0007e0dc44e4c16d76f62784a passed all three jobs: G5 Python tests, G6 runtime contract tests, and the stricter three-pass LaTeX build for G4, G6, and G5. The PDFs were produced as 9, 10, and 2 pages. The first pass emitted expected initial cross-reference warnings; the final pass had no unresolved-reference matches and the gate passed. The later theorem-assumption edits are in commit 899baac89f748ff8ba01ec2aa5c65e23405d1f9a. Workflow run 44200529810 is revalidating those edits; its Python jobs have passed and its LaTeX job is still running. Documentation-only commit 9e8ebb81c8fd245eebd94a74d5cccc21e9a920af triggered run 44200711250.
 
 ## 4. Mathematical and formal validity review
 

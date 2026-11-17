@@ -31,7 +31,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G6.3 | formal/tla/G6_RuntimeEnforcement.tla | Core finite-state TLA+ model encoded |
 | G6.4 | docs/verification/G6.4_TLC_RESULTS.md | Bounded TLC run passed; four negative-control mutants detected; refinement open |
 | G6.5 | docs/verification/G6.5_REFINEMENT_AND_TESTS.md | Refinement matrix specified; ten abstract runtime contract tests pass; production refinement open |
-| G6.6 | paper/formal/g6_runtime_assurance.tex | Full G6 assurance dossier compiles in CI; strict three-pass cross-reference gate rerun pending |
+| G6.6 | paper/formal/g6_runtime_assurance.tex | Full G6 assurance dossier passes three-pass CI and cross-reference checks; proof-premise revalidation pending |
 
 ## Critical statistical boundary
 
