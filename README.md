@@ -51,7 +51,6 @@ No empirical result is claimed until the corresponding experiment is implemented
     paper/formal/        G4, G5, and G6 LaTeX assurance dossiers
     formal/tla/          TLA+ runtime-enforcement model and TLC configurations
     tests/G6/            Executable abstract runtime contract tests
-    paper/formal/        LaTeX formal and statistical dossiers
     experiments/G5/      risk-control code, tests, results
     .github/workflows/   automated validation
 
@@ -64,7 +63,7 @@ Run the G5 synthetic experiment:
     python trajectory_risk_control.py --repetitions 2000 --sample-size 1500 --output results.csv
     python -m unittest discover -s . -p 'test_*.py'
 
-CI compiles both LaTeX dossiers and runs the Python tests on pushes and pull requests.
+CI compiles the G4, G5, and G6 LaTeX dossiers and runs the G5 and G6 Python test suites on pushes and pull requests.
 
 ## Research freeze rule
 

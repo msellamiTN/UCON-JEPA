@@ -28,11 +28,11 @@ Workflow run 44199003346 passed. TLC version 2026.11.15.002146, Java Temurin 17.
 
 ## G6.3 TLA+ model status
 
-Committed formal/tla/G6_RuntimeEnforcement.tla and its TLC configuration. The model checks the core synchronous acceptance path, revocation/policy races, JEPA non-authority, verification-before-commit, and ambiguous lost-response handling. Scope and omissions are documented in docs/verification/G6.3_TLA_MODEL.md. TLC was not available in the current execution environment; no model-checking pass or state count is claimed. Negative mutant controls M1–M4 are required before validation.
+Committed formal/tla/G6_RuntimeEnforcement.tla, the positive TLC configuration, and four mutant configurations. The module parsed and the finite positive model was checked by TLC in workflow run 44199003346: 13,441 states generated, 1,664 distinct states, zero remaining, and all seven configured invariants passed. Mutants M1–M4 detected their expected invariant violations. Full execution record: docs/verification/G6.4_TLC_RESULTS.md. The check is bounded to the committed finite abstraction.
 
 ## G6.2 transition-system status
 
-The LTS distinguishes Request, Authorize, predictive restriction, Prepare, GateCheck, Dispatch, Accept, Observe, Verify, Commit, revocation, policy publication, state mutation, crash, and recovery. Safety and liveness are separated. Tool-specific refinement obligations and ten counterexample scenarios are recorded in docs/research/G6.2_RUNTIME_TRANSITION_SYSTEM.md. No TLA+ model has yet been checked.
+The LTS distinguishes Request, Authorize, predictive restriction, Prepare, GateCheck, Dispatch, Accept, Observe, Verify, Commit, revocation, policy publication, state mutation, crash, and recovery. Safety and liveness are separated. Tool-specific refinement obligations and ten counterexample scenarios are recorded in docs/research/G6.2_RUNTIME_TRANSITION_SYSTEM.md. Its synchronous acceptance kernel is encoded and bounded-checked in G6.3–G6.4; richer asynchronous and resource-concurrency semantics remain open.
 
 ## G6.1 claims and status
 

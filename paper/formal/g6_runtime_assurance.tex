@@ -22,17 +22,17 @@
 \theoremstyle{remark}
 \newtheorem{remark}{Remark}[section]
 
-\newcommand{\Inv}{\mathcal I}
-\newcommand{\Cap}{\mathcal C}
-\newcommand{\Pol}{\mathcal P}
-\newcommand{\UAllowed}{\mathsf{UCONAllowed}}
-\newcommand{\Accept}{\mathsf{Accept}}
-\newcommand{\Revoke}{\mathsf{EffectiveRevoke}}
-\newcommand{\Publish}{\mathsf{PublishPolicy}}
-\newcommand{\Commit}{\mathsf{Commit}}
-\newcommand{\Status}{\mathsf{Status}}
-\newcommand{\TRUE}{\mathsf{TRUE}}
-\newcommand{\FALSE}{\mathsf{FALSE}}
+\newcommand{\UCONInv}{\mathcal I}
+\newcommand{\UCONCap}{\mathcal C}
+\newcommand{\UCONPol}{\mathcal P}
+\newcommand{\UCONAllowed}{\mathsf{UCONAllowed}}
+\newcommand{\UCONAccept}{\mathsf{Accept}}
+\newcommand{\UCONRevoke}{\mathsf{EffectiveRevoke}}
+\newcommand{\UCONPublish}{\mathsf{PublishPolicy}}
+\newcommand{\UCONCommit}{\mathsf{Commit}}
+\newcommand{\UCONStatus}{\mathsf{Status}}
+\newcommand{\UCONTrue}{\mathsf{TRUE}}
+\newcommand{\UCONFalse}{\mathsf{FALSE}}
 
 \title{UCON-JEPA: Runtime Enforcement Assurance\\
 \large Threat Model, Transition Semantics, TLA+ Model Checking, and Refinement Obligations}
@@ -162,9 +162,9 @@ No theorem may silently treat every enterprise API as T1.
 
 \subsection{Domains and state}
 
-Let $\Inv$ be a finite set of invocation identifiers, $\Cap$ a finite set of capabilities, and $\Pol$ a finite set of policy versions. Let $\UAllowed\subseteq\Inv$ be the invocations admitted by the abstract UCON predicate.
+Let $\UCONInv$ be a finite set of invocation identifiers, $\UCONCap$ a finite set of capabilities, and $\UCONPol$ a finite set of policy versions. Let $\UCONAllowed\subseteq\UCONInv$ be the invocations admitted by the abstract UCON predicate.
 
-For every $i\in\Inv$, the model stores:
+For every $i\in\UCONInv$, the model stores:
 \[
 \begin{split}
 &status[i],\ certPolicy[i],\ gatePassed[i],\ accepted[i],\\
@@ -173,12 +173,12 @@ For every $i\in\Inv$, the model stores:
 &outcomeUnknown[i],\ outcome[i],\ acceptedPolicy[i],\ jepa[i].
 \end{split}
 \]
-Global state contains $capRevoked\in\{\TRUE,\FALSE\}$ and $policyVersion\in\{1,2\}$.
+Global state contains $capRevoked\in\{\UCONTrue,\UCONFalse\}$ and $policyVersion\in\{1,2\}$.
 
 The lifecycle status set is:
 \[
 \begin{split}
-\Status=\{&NEW,AUTHORIZED,DENIED,DISPATCHED,ACCEPTED,\\
+\UCONStatus=\{&NEW,AUTHORIZED,DENIED,DISPATCHED,ACCEPTED,\\
 &OBSERVED,VERIFIED,COMMITTED,UNKNOWN\}.
 \end{split}
 \]
@@ -194,7 +194,7 @@ The explicit gate requires:
 \[
 \begin{split}
 GateCheck(i)\Rightarrow{}&
-status[i]=AUTHORIZED \land i\in\UAllowed\\
+status[i]=AUTHORIZED \land i\in\UCONAllowed\\
 &\land certPolicy[i]=policyVersion
 \land \neg capRevoked.
 \end{split}
@@ -207,7 +207,7 @@ The effect-boundary transition rechecks the authoritative conditions:
 \begin{split}
 Accept(i)\Rightarrow{}&
 status[i]=DISPATCHED \land gatePassed[i]\\
-&\land i\in\UAllowed
+&\land i\in\UCONAllowed
 \land certPolicy[i]=policyVersion\\
 &\land \neg capRevoked.
 \end{split}
@@ -215,7 +215,7 @@ status[i]=DISPATCHED \land gatePassed[i]\\
 On acceptance, the model records:
 \[
 \begin{split}
-accepted'[i]&=\TRUE,\\
+accepted'[i]&=\UCONTrue,\\
 acceptedWhileRevoked'[i]&=capRevoked,\\
 acceptedWithFreshPolicy'[i]&=(certPolicy[i]=policyVersion),\\
 acceptedPolicy'[i]&=policyVersion.
@@ -247,7 +247,7 @@ All theorems in this section are statements about the transition relation just d
 For an invocation $i$, define:
 \[
 AdmissibleAtAccept(i)\equiv
-i\in\UAllowed\land\neg capRevoked
+i\in\UCONAllowed\land\neg capRevoked
 \land certPolicy[i]=policyVersion
 \]
 at the acceptance linearization point.
@@ -256,11 +256,11 @@ at the acceptance linearization point.
 \begin{theorem}[No unauthorized acceptance]
 For every reachable state and invocation $i$:
 \[
-accepted[i]\Rightarrow i\in\UAllowed.
+accepted[i]\Rightarrow i\in\UCONAllowed.
 \]
 \end{theorem}
 \begin{proof}
-Induction on the length of a finite execution trace. In the initial state, $accepted[i]=FALSE$ for every $i$. All transitions other than Accept leave accepted unchanged. The only transition that changes accepted from FALSE to TRUE is Accept(i), whose enabling guard includes $i\in\UAllowed$. Therefore the property is preserved by every transition and holds in every reachable state.
+Induction on the length of a finite execution trace. In the initial state, $accepted[i]=FALSE$ for every $i$. All transitions other than Accept leave accepted unchanged. The only transition that changes accepted from FALSE to TRUE is Accept(i), whose enabling guard includes $i\in\UCONAllowed$. Therefore the property is preserved by every transition and holds in every reachable state.
 \end{proof}
 
 \begin{theorem}[No acceptance after effective revocation]
@@ -301,7 +301,7 @@ The initial state has committed[i]=FALSE. Only Commit(i) changes committed to TR
 Changing only the JEPA output cannot make a UCON-denied invocation acceptable.
 \end{theorem}
 \begin{proof}
-The authorization and acceptance guards depend on the UCON admission set, certificate policy version, revocation state, lifecycle state, and gate flag. They do not depend on jepa[i]. A ChangeJepa transition changes only the JEPA output variable. Hence it leaves the projection of the state onto all authorization variables unchanged and cannot enable an Accept transition for an invocation outside $\UAllowed$.
+The authorization and acceptance guards depend on the UCON admission set, certificate policy version, revocation state, lifecycle state, and gate flag. They do not depend on jepa[i]. A ChangeJepa transition changes only the JEPA output variable. Hence it leaves the projection of the state onto all authorization variables unchanged and cannot enable an Accept transition for an invocation outside $\UCONAllowed$.
 \end{proof}
 
 \begin{theorem}[Unknown outcome is not committed]
@@ -320,7 +320,7 @@ The transitions TimeoutUnknown and LoseAcceptanceResponse set outcomeUnknown[i] 
 
 The committed TLA+ module is \texttt{formal/tla/G6\_RuntimeEnforcement.tla}. The positive configuration uses:
 \[
-\Inv=\{i_1,i_2\},\qquad \UAllowed=\{i_1\},
+\UCONInv=\{i_1,i_2\},\qquad \UCONAllowed=\{i_1\},
 \]
 with UCON, revocation, policy freshness, and verification enforcement enabled.
 
