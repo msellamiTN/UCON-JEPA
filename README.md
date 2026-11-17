@@ -26,6 +26,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G5.6 | docs/research/G5.6_EVALUATION_PROTOCOL.md | Confirmatory protocol specified |
 | G6.1 | docs/research/G6.1_THREAT_MODEL_AND_TCB.md | Threat model, TCB, effect boundary, and JEPA non-authority specified; implementation evidence open |
 | G6.2 | docs/research/G6.2_RUNTIME_TRANSITION_SYSTEM.md | Labelled transition system and refinement obligations specified; TLA+ validation open |
+| G6.3 | formal/tla/G6_RuntimeEnforcement.tla | Core finite-state TLA+ model encoded; TLC execution pending |
 
 ## Critical statistical boundary
 
@@ -44,6 +45,7 @@ No empirical result is claimed until the corresponding experiment is implemented
 
     docs/research/       G2, G3, G5, and G6 research specifications
     docs/verification/   proof ledger, validation protocol, counterexamples
+    formal/tla/          TLA+ runtime-enforcement model and TLC configurations
     paper/formal/        LaTeX formal and statistical dossiers
     experiments/G5/      risk-control code, tests, results
     .github/workflows/   automated validation
