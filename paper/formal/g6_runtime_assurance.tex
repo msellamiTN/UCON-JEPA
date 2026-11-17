@@ -1,0 +1,451 @@
+% !TeX program = pdflatex
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[margin=25mm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs,longtable,array}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,calc}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue}
+
+\newtheorem{definition}{Definition}[section]
+\newtheorem{assumption}{Assumption}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[section]
+
+\newcommand{\Inv}{\mathcal I}
+\newcommand{\Cap}{\mathcal C}
+\newcommand{\Pol}{\mathcal P}
+\newcommand{\UAllowed}{\mathsf{UCONAllowed}}
+\newcommand{\Accept}{\mathsf{Accept}}
+\newcommand{\Revoke}{\mathsf{EffectiveRevoke}}
+\newcommand{\Publish}{\mathsf{PublishPolicy}}
+\newcommand{\Commit}{\mathsf{Commit}}
+\newcommand{\Status}{\mathsf{Status}}
+\newcommand{\TRUE}{\mathsf{TRUE}}
+\newcommand{\FALSE}{\mathsf{FALSE}}
+
+\title{UCON-JEPA: Runtime Enforcement Assurance\\
+\large Threat Model, Transition Semantics, TLA+ Model Checking, and Refinement Obligations}
+\author{UCON-JEPA Research Project}
+\date{Version 0.1 --- 18 November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This dossier develops a bounded formal assurance model for the runtime-enforcement boundary of UCON-JEPA. The architecture separates authoritative usage-control enforcement from advisory JEPA-based trajectory prediction. We define the trusted computing base, adversarial and fault assumptions, event-level operational semantics, and a finite-state TLA+ abstraction for authorization, capability revocation, policy publication, external acceptance, evidence verification, and governance commit. We state and prove safety properties for the abstract transition system, report a bounded TLC exploration of 1,664 distinct states, and describe four negative-control mutations that trigger the expected invariant violations. Ten executable reference-contract tests also pass in continuous integration. These results validate the specified finite abstraction and reference harness only. They do not establish complete mediation, linearizability, or correctness of any production gateway or external tool adapter; those remain refinement obligations.
+\end{abstract}
+
+\tableofcontents
+
+\section{Scope, contribution, and proof status}
+
+\subsection{Research question}
+
+Can a predictive assurance layer be integrated into autonomous-agent workflows without weakening formal usage-control enforcement, and can the critical runtime assumptions be stated precisely enough to support model checking and implementation refinement?
+
+The central architectural rule is:
+\begin{quote}
+A learned predictor may recommend restriction, escalation, or abstention, but it cannot grant authority or bypass the authoritative UCON execution gate.
+\end{quote}
+
+This dossier formalizes a small synchronous acceptance kernel. It is not a complete semantics for every MCP server, cloud API, asynchronous job system, or distributed transaction protocol.
+
+\subsection{Proof-status vocabulary}
+
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Proved in the abstract model:} follows from the stated transition relation and its guards.
+\item \textbf{Model-checked:} TLC exhaustively explored the finite configured state space and found no violation of the listed invariants.
+\item \textbf{Reference-tested:} executable tests passed against the Python reference harness.
+\item \textbf{Conditional for deployment:} requires a concrete implementation to refine the abstract event and preserve its guards.
+\item \textbf{Open:} no sufficient proof or implementation evidence is available.
+\end{itemize}
+
+A finite TLC result is not an unbounded theorem about arbitrary implementations. A reference test is not evidence about a production adapter unless the same tests are executed at that adapter boundary.
+
+\section{System and threat model}
+
+\subsection{Principals and components}
+
+The abstract architecture contains an autonomous agent/planner, JEPA predictor, policy administration plane, UCON policy evaluator, execution gateway, tool adapter, external service, effect verifier, durable intent/audit log, and optional human approver.
+
+The logical agent identity is not necessarily the effective principal. The effective principal is the identity recognized by the external service, such as a workload identity, service principal, delegated user, or scoped credential. Authorization must bind to that identity and its delegation chain.
+
+\subsection{Protected assets}
+
+The protected assets are enterprise data and services; identities, credentials, sessions, capabilities, and delegation; policies, obligations, conditions, and approval records; resource and workflow state; external side effects; provenance and audit records; and version bindings among models, scores, policies, tools, and labels.
+
+\subsection{Adversary and fault assumptions}
+
+The agent, plan, tool arguments, and retrieved content are untrusted. The adversary may induce prompt injection, confused-deputy behaviour, replay, duplicate requests, plan mutation, stale-state use, revocation races, policy-update races, timeout ambiguity, and incomplete effect evidence. The model also considers crash-stop failures, delayed/duplicated messages, network partitions, and asynchronous service completion.
+
+The initial model does not prove resistance to arbitrary kernel compromise, malicious provider control planes, cryptographic breaks, arbitrary Byzantine replicas, covert channels, or side-channel leakage. Business-policy correctness is also outside the proof.
+
+\subsection{Trusted computing base}
+
+For authorization soundness, the minimum trusted computing base comprises:
+\begin{enumerate}[leftmargin=2em]
+\item identity and effective-principal binding;
+\item the formal UCON evaluator;
+\item authoritative policy and state versions;
+\item the execution gateway/reference monitor;
+\item each protected tool adapter;
+\item the effect-boundary/linearization protocol;
+\item certificate and message integrity;
+\item durable intent/evidence recording for recovery claims.
+\end{enumerate}
+
+The JEPA encoder, predictor, risk head, calibration threshold, and dashboard are not authorization roots of trust. The verifier is trusted only for claims relying on the correctness and completeness of effect evidence.
+
+\section{Enforcement boundary and event semantics}
+
+\subsection{Distinct lifecycle events}
+
+For invocation $i$, distinguish:
+\[
+\begin{split}
+&\mathsf{Request}(i),\quad \mathsf{Authorize}(i),\quad
+\mathsf{Prepare}(i),\quad \mathsf{GateCheck}(i),\\
+&\mathsf{Dispatch}(i),\quad \mathsf{Accept}(i),\quad
+\mathsf{Observe}(i),\quad \mathsf{Verify}(i),\quad
+\mathsf{Commit}(i).
+\end{split}
+\]
+Preparation is optional. Dispatch is not acceptance. Observation is not verification. Governance commit is not the external effect.
+
+For a successfully committed synchronous invocation, the required order is:
+\[
+Request \prec Authorize \prec GateCheck \prec Accept
+\prec Observe \prec Verify \prec Commit.
+\]
+
+\subsection{External-effect linearization point}
+
+The security-relevant linearization point is the event at which the external service accepts the protected effect. It is denoted $\mathsf{Accept}(i)$. For a synchronous atomic API it may coincide with the mutation. For an asynchronous API, job acceptance and later job completion are distinct events and require a richer model.
+
+A local database commit, agent success message, or audit event is not a substitute for the service-side acceptance boundary.
+
+\subsection{Revocation and policy publication}
+
+A revocation request is distinct from effective revocation. $\mathsf{EffectiveRevoke}(c)$ is the linearization point at which the capability is revoked in the authoritative state visible to every relevant gate, or an equivalent coordination protocol guarantees no later acceptance with that capability.
+
+A policy update has an effective publication event $\mathsf{PublishPolicy}(v+1)$. Acceptance must be serialized against this event or revalidate the policy version at acceptance. Revocation and policy updates do not retroactively undo an effect accepted before their effective point.
+
+\subsection{Tool classes}
+
+\begin{longtable}{p{0.12\linewidth}p{0.34\linewidth}p{0.46\linewidth}}
+\toprule
+Class & API behaviour & Required treatment\\
+\midrule
+T1 & Synchronous atomic operation & Single service-side acceptance point.\\
+T2 & Asynchronous job & Model job acceptance and final effect separately; specify cancellation.\\
+T3 & Idempotent retry & Bind a stable idempotency key and model duplicate semantics.\\
+T4 & Non-idempotent ambiguous timeout & Enter UNKNOWN and reconcile before retry.\\
+T5 & Conditional transaction/CAS & Compare version and apply effect atomically.\\
+T6 & Weakly observable operation & Do not claim verified mutation consistency; contain or reconcile manually.\\
+\bottomrule
+\end{longtable}
+
+No theorem may silently treat every enterprise API as T1.
+
+\section{Finite-state transition system}
+
+\subsection{Domains and state}
+
+Let $\Inv$ be a finite set of invocation identifiers, $\Cap$ a finite set of capabilities, and $\Pol$ a finite set of policy versions. Let $\UAllowed\subseteq\Inv$ be the invocations admitted by the abstract UCON predicate.
+
+For every $i\in\Inv$, the model stores:
+\[
+\begin{split}
+&status[i],\ certPolicy[i],\ gatePassed[i],\ accepted[i],\\
+&acceptedWhileRevoked[i],\ acceptedWithFreshPolicy[i],\\
+&observed[i],\ verified[i],\ committed[i],\\
+&outcomeUnknown[i],\ outcome[i],\ acceptedPolicy[i],\ jepa[i].
+\end{split}
+\]
+Global state contains $capRevoked\in\{\TRUE,\FALSE\}$ and $policyVersion\in\{1,2\}$.
+
+The lifecycle status set is:
+\[
+\begin{split}
+\Status=\{&NEW,AUTHORIZED,DENIED,DISPATCHED,ACCEPTED,\\
+&OBSERVED,VERIFIED,COMMITTED,UNKNOWN\}.
+\end{split}
+\]
+
+\subsection{Authorization and gate}
+
+An invocation is authorized only if its abstract UCON predicate holds. The certificate stores the active policy version:
+\[
+Authorize(i)\Rightarrow certPolicy'[i]=policyVersion.
+\]
+
+The explicit gate requires:
+\[
+\begin{split}
+GateCheck(i)\Rightarrow{}&
+status[i]=AUTHORIZED \land i\in\UAllowed\\
+&\land certPolicy[i]=policyVersion
+\land \neg capRevoked.
+\end{split}
+\]
+
+\subsection{Acceptance transition}
+
+The effect-boundary transition rechecks the authoritative conditions:
+\[
+\begin{split}
+Accept(i)\Rightarrow{}&
+status[i]=DISPATCHED \land gatePassed[i]\\
+&\land i\in\UAllowed
+\land certPolicy[i]=policyVersion\\
+&\land \neg capRevoked.
+\end{split}
+\]
+On acceptance, the model records:
+\[
+\begin{split}
+accepted'[i]&=\TRUE,\\
+acceptedWhileRevoked'[i]&=capRevoked,\\
+acceptedWithFreshPolicy'[i]&=(certPolicy[i]=policyVersion),\\
+acceptedPolicy'[i]&=policyVersion.
+\end{split}
+\]
+The acceptance transition is the abstract linearization point. The guards are not merely a check performed earlier at dispatch time.
+
+\subsection{Observation, verification, and commit}
+
+Observation requires an accepted effect. Verification requires an observation and checks the effect against the declared mutation relation. Commit is enabled only from VERIFIED:
+\[
+Commit(i)\Rightarrow verified[i]\land observed[i].
+\]
+A missing or uncorrelated receipt leads to UNKNOWN/reconciliation-required. An ambiguous response does not imply that the external effect did not occur.
+
+\subsection{JEPA isolation}
+
+The JEPA output variable takes values in:
+\[
+\{ALLOW\_RECOMMENDATION,RESTRICT,ESCALATE,ABSTAIN\}.
+\]
+It is intentionally absent from the guards of Authorize, GateCheck, and Accept. A policy may impose additional restrictions based on predictive evidence, but a positive score is never sufficient authorization.
+
+\section{Safety properties and proofs}
+
+All theorems in this section are statements about the transition relation just defined. Their deployment interpretation is conditional on a correct refinement.
+
+\begin{definition}[Acceptance admissibility]
+For an invocation $i$, define:
+\[
+AdmissibleAtAccept(i)\equiv
+i\in\UAllowed\land\neg capRevoked
+\land certPolicy[i]=policyVersion
+\]
+at the acceptance linearization point.
+\end{definition}
+
+\begin{theorem}[No unauthorized acceptance]
+For every reachable state and invocation $i$:
+\[
+accepted[i]\Rightarrow i\in\UAllowed.
+\]
+\end{theorem}
+\begin{proof}
+Induction on the length of a finite execution trace. In the initial state, $accepted[i]=FALSE$ for every $i$. All transitions other than Accept leave accepted unchanged. The only transition that changes accepted from FALSE to TRUE is Accept(i), whose enabling guard includes $i\in\UAllowed$. Therefore the property is preserved by every transition and holds in every reachable state.
+\end{proof}
+
+\begin{theorem}[No acceptance after effective revocation]
+For every reachable state and invocation $i$:
+\[
+accepted[i]\Rightarrow\neg acceptedWhileRevoked[i].
+\]
+\end{theorem}
+\begin{proof}
+Initially acceptedWhileRevoked is FALSE. Only Accept(i) writes this variable, and its guard requires $\neg capRevoked$. At that transition, acceptedWhileRevoked'[i] is assigned the current value of capRevoked, hence FALSE. EffectiveRevoke may set capRevoked to TRUE later, but it does not alter the recorded acceptance-time value. Thus the invariant is inductive.
+\end{proof}
+
+\begin{remark}
+This theorem does not claim that an effect accepted before revocation can be cancelled. It states only that the abstract acceptance event cannot linearize after effective revocation while using the revoked capability.
+\end{remark}
+
+\begin{theorem}[No stale-policy acceptance]
+For every reachable state and invocation $i$:
+\[
+accepted[i]\Rightarrow acceptedWithFreshPolicy[i].
+\]
+\end{theorem}
+\begin{proof}
+Initially acceptedWithFreshPolicy is FALSE. Only Accept(i) writes it. The guard of Accept requires $certPolicy[i]=policyVersion$, and the transition stores exactly this equality as acceptedWithFreshPolicy'[i]. Therefore the property is inductive.
+\end{proof}
+
+\begin{theorem}[Commit requires verified evidence]
+For every reachable state and invocation $i$:
+\[
+committed[i]\Rightarrow verified[i]\land observed[i].
+\]
+\end{theorem}
+\begin{proof}
+The initial state has committed[i]=FALSE. Only Commit(i) changes committed to TRUE. Its enabling condition requires status[i]=VERIFIED, verified[i], and observed[i]. No other transition changes committed. The implication is therefore preserved.
+\end{proof}
+
+\begin{theorem}[JEPA non-authority]
+Changing only the JEPA output cannot make a UCON-denied invocation acceptable.
+\end{theorem}
+\begin{proof}
+The authorization and acceptance guards depend on the UCON admission set, certificate policy version, revocation state, lifecycle state, and gate flag. They do not depend on jepa[i]. A ChangeJepa transition changes only the JEPA output variable. Hence it leaves the projection of the state onto all authorization variables unchanged and cannot enable an Accept transition for an invocation outside $\UAllowed$.
+\end{proof}
+
+\begin{theorem}[Unknown outcome is not committed]
+For every reachable state and invocation $i$:
+\[
+outcomeUnknown[i]\Rightarrow\neg committed[i].
+\]
+\end{theorem}
+\begin{proof}
+The transitions TimeoutUnknown and LoseAcceptanceResponse set outcomeUnknown[i] to TRUE and status[i] to UNKNOWN. Commit is enabled only from VERIFIED. No transition in this model moves UNKNOWN to VERIFIED or sets committed from UNKNOWN. The implication is preserved. A future reconciliation extension must define a separate evidence-backed transition before permitting commit.
+\end{proof}
+
+\section{TLC model checking and mutation controls}
+
+\subsection{Reproducibility configuration}
+
+The committed TLA+ module is \texttt{formal/tla/G6\_RuntimeEnforcement.tla}. The positive configuration uses:
+\[
+\Inv=\{i_1,i_2\},\qquad \UAllowed=\{i_1\},
+\]
+with UCON, revocation, policy freshness, and verification enforcement enabled.
+
+The recorded TLC tool version is 2026.11.15.002146 (revision bc1b506), running on Eclipse Temurin Java 17.0.21+9 with one worker.
+
+\subsection{Positive model-checking result}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lr}
+\toprule
+Metric & Result\\
+\midrule
+States generated & 13,441\\
+Distinct states explored & 1,664\\
+States remaining on queue & 0\\
+Configured invariants & 7\\
+Invariant violations & 0\\
+Workflow conclusion & Success\\
+\bottomrule
+\end{tabular}
+\caption{TLC result for the finite synchronous acceptance model.}
+\end{table}
+
+The checked invariants are TypeOK, NoUnauthorizedAcceptance, NoAcceptanceAfterRevocation, NoStalePolicyAcceptance, CommitRequiresVerification, UnknownNotCommitted, and JepaCannotAuthorize.
+
+\subsection{Negative controls}
+
+Four mutant configurations intentionally disable one enforcement guard. TLC detected the corresponding invariant violation in every case.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+Mutant & Disabled control & Detected invariant\\
+\midrule
+M1 & Revocation check & NoAcceptanceAfterRevocation\\
+M2 & Policy freshness check & NoStalePolicyAcceptance\\
+M3 & UCON admission guard & NoUnauthorizedAcceptance\\
+M4 & Verification-before-commit & CommitRequiresVerification\\
+\bottomrule
+\end{tabular}
+\caption{Negative-control mutation results.}
+\end{table}
+
+The positive run and all four negative controls completed successfully in GitHub Actions run \url{https://github.com/msellamiTN/UCON-JEPA/actions/runs/44199003346}. The retained log artifact is named \texttt{g6-tla-validation-logs}.
+
+\section{Executable reference-contract tests}
+
+A Python reference harness in \texttt{tests/G6/test\_runtime\_contract.py} exercises ten cases:
+\begin{enumerate}[leftmargin=2em]
+\item verified happy-path lifecycle;
+\item JEPA positive recommendation cannot override UCON denial;
+\item revocation between authorization and acceptance;
+\item policy update between authorization and acceptance;
+\item action/principal/capability binding;
+\item duplicate invocation identifier rejection;
+\item commit-before-verification rejection;
+\item uncorrelated receipt produces UNKNOWN;
+\item lost acceptance response preserves remote acceptance but blocks commit;
+\item all six permutations of revocation, policy publication, and acceptance.
+\end{enumerate}
+All ten tests passed in Python 3.12 in workflow run \url{https://github.com/msellamiTN/UCON-JEPA/actions/runs/44199165327}.
+
+These tests execute a reference model. They do not exercise a production tool adapter.
+
+\section{Refinement obligations and open assumptions}
+
+\subsection{Abstract-to-concrete mapping}
+
+\begin{longtable}{p{0.25\linewidth}p{0.35\linewidth}p{0.32\linewidth}}
+\toprule
+Assumption & Required implementation control & Evidence required\\
+\midrule
+Complete mediation & Gateway-only routing and credentials & Operation inventory, direct-bypass negative tests\\
+Identity binding & Effective principal and delegation binding & Confused-deputy and credential-scope tests\\
+Certificate integrity & Invocation/action/target/principal/version binding & Replay, substitution, and tampering tests\\
+Authoritative state & Versioned policy and resource authority & Stale-cache and replica-race tests\\
+Evaluator correctness & Versioned reference semantics & Differential policy tests\\
+Effect linearizability & Atomic accept, CAS, transaction, or reservation & Per-adapter race tests\\
+Revocation & Effective revocation serialized with acceptance & Revoke-before-accept race tests\\
+Policy update & Version check at acceptance & Update-before-accept race tests\\
+Effect evidence & Correlated receipt and read-after-write/attestation & Forged/stale/missing receipt tests\\
+Durable intent & Write-ahead intent and recoverable log & Crash injection and recovery tests\\
+Serializability & CAS/ETag/transaction/lock protocol & Concurrent resource invariant tests\\
+JEPA isolation & No authority or direct credentials for predictor & Fault injection and bypass tests\\
+\bottomrule
+\end{longtable}
+
+\subsection{Open model extensions}
+
+The current model does not yet encode:
+\begin{itemize}[leftmargin=2em]
+\item action, target, principal, delegation-chain, plan-hash, and cryptographic certificate fields;
+\item mutable resource balances and concurrent compare-and-apply;
+\item asynchronous job completion and cancellation;
+\item retry semantics and a complete idempotency-key table;
+\item write-ahead logging, crash recovery, compensation, and containment;
+\item multiple policy replicas, state replicas, and network partitions;
+\item fairness, availability, bounded latency, or liveness.
+\end{itemize}
+
+The reference harness is likewise in-memory and does not implement distributed consistency or real API adapters.
+
+\section{Limitations and claim discipline}
+
+The TLC result is exhaustive only for the finite state space induced by the committed configuration. The proofs are inductive over the abstract transition relation, not over a concrete software implementation. The implementation claim requires a refinement map and evidence that each real adapter's acceptance event preserves the abstract guards.
+
+In particular:
+\begin{enumerate}[leftmargin=2em]
+\item a pre-dispatch gate check is insufficient if revocation or policy can change before remote acceptance;
+\item revocation does not undo effects accepted before its effective point;
+\item an asynchronous job may complete after the capability is revoked unless cancellation/containment is separately specified;
+\item timeout without authoritative evidence is UNKNOWN, not safe, failed, or committed;
+\item state-version equality is not serializability unless checked atomically with the mutation;
+\item a model-checking pass does not prove complete mediation or cryptographic correctness;
+\item sandbox/model results do not automatically transfer to production.
+\end{enumerate}
+
+\section{Conclusion and next proof obligations}
+
+G6 establishes a precise, testable boundary for a predictive assurance layer that cannot supersede formal UCON enforcement. The finite synchronous model passes its configured invariants and all four negative-control mutants are detected. The Python reference contract suite passes ten tests.
+
+The next proof obligations are implementation-facing: select a concrete adapter with conditional/transactional semantics; demonstrate gateway-only credentials and routes; implement certificate binding; test revoke/update/accept races; add asynchronous, retry, crash, and concurrent-resource models; and produce a refinement argument from concrete traces to the abstract LTS.
+
+Until these obligations are discharged, G6 is a validated abstract assurance model—not a production security certification.
+
+\end{document}
