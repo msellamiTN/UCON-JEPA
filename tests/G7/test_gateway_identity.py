@@ -133,6 +133,14 @@ class GatewayIdentityTests(unittest.TestCase):
         self.assertEqual(broker.scopes, [])
         self.assertEqual(transport.requests, [])
 
+    def test_encoded_or_backslash_path_separators_denied(self):
+        for key in ("%2fadmin", "a\\\\b", "x?y"):
+            gateway, _, _, broker, transport = make()
+            with self.assertRaises(GatewayDenied):
+                gateway.execute(self.request(key=key), invocation_id="i")
+            self.assertEqual(broker.scopes, [])
+            self.assertEqual(transport.requests, [])
+
     def test_unknown_operation_denied(self):
         gateway, _, _, _, transport = make()
         with self.assertRaises(GatewayDenied):
