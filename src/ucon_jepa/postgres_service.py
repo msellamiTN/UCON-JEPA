@@ -14,6 +14,7 @@ from typing import Callable
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from .transactional_service import IdempotencyConflict, MutationResult
 
@@ -275,6 +276,18 @@ class PostgresUconService:
                     (invocation_id, digest, outcome, reason, new_version,
                      pv, epoch, seq, receipt),
                 )
+                if outcome == "ACCEPTED":
+                    cur.execute(
+                        "INSERT INTO ucon_outbox(event_id,invocation_id,event_type,payload) "
+                        "VALUES(%s,%s,'RESOURCE_MUTATED',%s)",
+                        (invocation_id, invocation_id, Jsonb({
+                            "invocation_id": invocation_id, "principal": principal,
+                            "action": action, "resource_id": resource_id,
+                            "resource_version": new_version, "receipt_id": receipt,
+                            "policy_version": pv, "authorization_epoch": epoch,
+                            "event_sequence": seq,
+                        })),
+                    )
                 if self.fault_hook:
                     self.fault_hook("before_commit")
             conn.commit()
