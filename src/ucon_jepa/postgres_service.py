@@ -77,7 +77,9 @@ class PostgresUconService:
         );
         """
         with self._connect() as conn:
-            conn.execute(ddl)
+            for statement in ddl.split(";"):
+                if statement.strip():
+                    conn.execute(statement)
 
     @staticmethod
     def _lock_control(cur):
