@@ -56,4 +56,4 @@ jobs:
         env:
           PYTHONPATH: src
           UCON_JEPA_TEST_POSTGRES_DSN: "postgresql://ucon:ucon_test_password@localhost:5432/ucon_test"
-        run: python -m unittest tests.G7.test_postgres_service -v
+        run: python -m unittest discover -s tests/G7 -p "test_postgres_service.py" -v
