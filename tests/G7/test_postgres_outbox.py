@@ -82,8 +82,26 @@ class PostgresOutboxTests(unittest.TestCase):
         second_claim = self.outbox.claim(limit=100, lease_seconds=0)
         redelivered = next(item for item in second_claim if item.event_id == invocation)
         self.assertFalse(self.receiver.process(redelivered))
-        self.assertTrue(self.outbox.acknowledge(invocation))
-        self.assertFalse(self.outbox.acknowledge(invocation))
+        self.assertTrue(self.outbox.acknowledge(
+            invocation, attempts=redelivered.attempts
+        ))
+        self.assertFalse(self.outbox.acknowledge(
+            invocation, attempts=event.attempts
+        ))
+
+    def test_stale_lease_holder_cannot_acknowledge_newer_claim(self):
+        invocation, _ = self.create_accepted_event()
+        old_claim = self.outbox.claim(limit=100, lease_seconds=0)
+        old_event = next(item for item in old_claim if item.event_id == invocation)
+        new_claim = self.outbox.claim(limit=100, lease_seconds=0)
+        new_event = next(item for item in new_claim if item.event_id == invocation)
+        self.assertGreater(new_event.attempts, old_event.attempts)
+        self.assertFalse(self.outbox.acknowledge(
+            invocation, attempts=old_event.attempts
+        ))
+        self.assertTrue(self.outbox.acknowledge(
+            invocation, attempts=new_event.attempts
+        ))
 
     def test_dispatcher_acknowledges_only_after_successful_send(self):
         invocation, _ = self.create_accepted_event()
