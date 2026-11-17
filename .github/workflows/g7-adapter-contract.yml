@@ -1,4 +1,4 @@
-name: G7 adapter, identity, and refinement contract
+name: G7 adapter, identity, refinement, and recovery contract
 
 on:
   push:
