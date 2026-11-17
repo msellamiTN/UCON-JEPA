@@ -43,3 +43,25 @@ Explain how the learned representation and rollout produce a risk score, how cal
 5. A simulation validating nominal coverage under assumptions.
 6. Stress tests under controlled distribution shift.
 7. A clear deployment statement limiting the guarantee to its supported population.
+
+
+## Resolution update — 2026-11-18
+
+The G5.1–G5.4 estimand, method, theorem, proof, and runtime integration are now specified in:
+- G5.1_ESTIMAND_AND_SAMPLING.md
+- G5.2_FINITE_SAMPLE_METHOD.md
+- G5.3_THEOREM_AND_PROOF.md
+- G5.4_RUNTIME_INTEGRATION.md
+- paper/formal/g5_statistical_assurance.tex
+
+The fixed-sequence Clopper–Pearson theorem is proved under IID episode sampling, frozen model/score/policy scope, a pre-specified threshold family, and complete binary episode labels.
+
+Still open:
+- Whether real workflow episodes can be sampled independently or require cluster-level units.
+- Whether sandbox labels transfer to production.
+- Whether agent policy adaptation is represented in the calibration target.
+- Whether the JEPA score has useful risk-ranking power.
+- Whether OOD/version shift can be detected and handled with acceptable coverage.
+- Whether a stronger dependence-aware finite-sample guarantee is needed.
+
+The generic fixed-sequence selective-risk method is existing work (Dong et al., 2026); it is not claimed as a new UCON-JEPA theorem.
