@@ -38,6 +38,12 @@ jobs:
         run: |
           pdflatex -interaction=nonstopmode -halt-on-error g4_proof_dossier.tex
           pdflatex -interaction=nonstopmode -halt-on-error g4_proof_dossier.tex
+      - name: Build G6 runtime assurance dossier
+        working-directory: paper/formal
+        run: |
+          pdflatex -interaction=nonstopmode -halt-on-error g6_runtime_assurance.tex
+          pdflatex -interaction=nonstopmode -halt-on-error g6_runtime_assurance.tex
+
       - name: Build G5 statistical assurance dossier
         working-directory: paper/formal
         run: |
