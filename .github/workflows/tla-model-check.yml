@@ -1,0 +1,66 @@
+name: TLA+ runtime enforcement model
+
+on:
+  push:
+    paths:
+      - "formal/tla/**"
+      - "docs/verification/G6.3_TLA_MODEL.md"
+      - ".github/workflows/tla-model-check.yml"
+  pull_request:
+    paths:
+      - "formal/tla/**"
+      - "docs/verification/G6.3_TLA_MODEL.md"
+      - ".github/workflows/tla-model-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tlc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download pinned TLA+ tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tools artifacts
+          curl --fail --location --retry 3 \
+            https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar \
+            --output .tools/tla2tools.jar
+          echo "0b57675323babad8ab3815b1db9f30e75dac1cdb  .tools/tla2tools.jar" | sha1sum --check -
+
+      - name: Parse TLA+ module
+        shell: bash
+        run: |
+          set -o pipefail
+          java -cp .tools/tla2tools.jar tla2sany.SANY formal/tla/G6_RuntimeEnforcement.tla \
+            2>&1 | tee artifacts/sany.log
+
+      - name: Run TLC
+        shell: bash
+        run: |
+          set -o pipefail
+          java -XX:+UseParallelGC -Xmx3g -jar .tools/tla2tools.jar \
+            -config formal/tla/G6_RuntimeEnforcement.cfg \
+            -workers 1 \
+            formal/tla/G6_RuntimeEnforcement.tla \
+            2>&1 | tee artifacts/tlc.log
+
+      - name: Upload model-checking logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g6-tla-validation-logs
+          path: artifacts/
+          if-no-files-found: warn
