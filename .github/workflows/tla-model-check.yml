@@ -57,6 +57,34 @@ jobs:
             formal/tla/G6_RuntimeEnforcement.tla \
             2>&1 | tee artifacts/tlc.log
 
+      - name: Verify negative mutant controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_mutant() {
+            local name="$1"
+            local config="$2"
+            local expected="$3"
+            local log="artifacts/$name.log"
+            if java -XX:+UseParallelGC -Xmx3g -jar .tools/tla2tools.jar \
+              -config "$config" -workers 1 \
+              formal/tla/G6_RuntimeEnforcement.tla >"$log" 2>&1; then
+              echo "ERROR: $name unexpectedly passed."
+              cat "$log"
+              exit 1
+            fi
+            if ! grep -q "$expected" "$log"; then
+              echo "ERROR: $name failed for an unexpected reason."
+              cat "$log"
+              exit 1
+            fi
+            echo "$name: expected invariant violation detected ($expected)."
+          }
+          run_mutant M1 formal/tla/G6_M1_RevocationDisabled.cfg NoAcceptanceAfterRevocation
+          run_mutant M2 formal/tla/G6_M2_PolicyFreshnessDisabled.cfg NoStalePolicyAcceptance
+          run_mutant M3 formal/tla/G6_M3_UconDisabled.cfg NoUnauthorizedAcceptance
+          run_mutant M4 formal/tla/G6_M4_VerificationDisabled.cfg CommitRequiresVerification
+
       - name: Upload model-checking logs
         if: always()
         uses: actions/upload-artifact@v4
