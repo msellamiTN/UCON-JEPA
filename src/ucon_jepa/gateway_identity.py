@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from hashlib import sha256
+import re
 from typing import Mapping, Protocol
 import time
 
@@ -154,7 +155,8 @@ class GatewayMediator:
         if not route.service_audience or not route.path_template.startswith("/"):
             raise GatewayDenied("invalid trusted route configuration")
         # Resource key is a path segment, not an arbitrary URL/path expression.
-        if "/" in request.resource_key or request.resource_key in (".", ".."):
+        if (not re.fullmatch(r"[A-Za-z0-9._~-]{1,128}", request.resource_key)
+                or request.resource_key in (".", "..")):
             raise GatewayDenied("invalid resource key")
         target = route.path_template.replace("{resource}", request.resource_key)
         if "{resource}" in target or target.startswith("//") or "://" in target:
