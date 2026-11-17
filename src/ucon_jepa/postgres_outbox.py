@@ -9,6 +9,8 @@ once.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Callable, Any
 
 from .postgres_service import PostgresConfig, PostgresUconService
@@ -118,6 +120,7 @@ class PostgresIdempotentReceiver:
                 CREATE TABLE IF NOT EXISTS ucon_receiver_inbox (
                     event_id TEXT PRIMARY KEY,
                     event_type TEXT NOT NULL,
+                    payload_digest TEXT NOT NULL,
                     received_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
                 )
             """)
@@ -136,14 +139,23 @@ class PostgresIdempotentReceiver:
         required = ("resource_id", "resource_version")
         if any(key not in payload for key in required):
             raise ValueError("event payload lacks required resource binding")
+        digest = hashlib.sha256(json.dumps(
+            payload, sort_keys=True, separators=(",", ":")
+        ).encode()).hexdigest()
         with self.service._connect() as conn:
             with conn.cursor() as cur:
                 inserted = cur.execute(
-                    "INSERT INTO ucon_receiver_inbox(event_id,event_type) VALUES(%s,%s) "
-                    "ON CONFLICT(event_id) DO NOTHING RETURNING event_id",
-                    (event.event_id, event.event_type),
+                    "INSERT INTO ucon_receiver_inbox(event_id,event_type,payload_digest) "
+                    "VALUES(%s,%s,%s) ON CONFLICT(event_id) DO NOTHING RETURNING event_id",
+                    (event.event_id, event.event_type, digest),
                 ).fetchone()
                 if inserted is None:
+                    prior = cur.execute(
+                        "SELECT event_type,payload_digest FROM ucon_receiver_inbox "
+                        "WHERE event_id=%s", (event.event_id,)
+                    ).fetchone()
+                    if prior["event_type"] != event.event_type or prior["payload_digest"] != digest:
+                        raise ValueError("event ID replayed with different event content")
                     return False
                 cur.execute(
                     "INSERT INTO ucon_receiver_effects(event_id,resource_id,observed_version) "
