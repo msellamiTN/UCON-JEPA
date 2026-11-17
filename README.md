@@ -25,6 +25,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G5.5 | experiments/G5/ | Synthetic simulation and tests committed |
 | G5.6 | docs/research/G5.6_EVALUATION_PROTOCOL.md | Confirmatory protocol specified |
 | G6.1 | docs/research/G6.1_THREAT_MODEL_AND_TCB.md | Threat model, TCB, effect boundary, and JEPA non-authority specified; implementation evidence open |
+| G6.2 | docs/research/G6.2_RUNTIME_TRANSITION_SYSTEM.md | Labelled transition system and refinement obligations specified; TLA+ validation open |
 
 ## Critical statistical boundary
 
