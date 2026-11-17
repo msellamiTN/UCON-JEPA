@@ -75,6 +75,20 @@ class PostgresUconService:
             authorization_epoch BIGINT NOT NULL, event_sequence BIGINT NOT NULL,
             receipt_id TEXT
         );
+        CREATE TABLE IF NOT EXISTS ucon_outbox (
+            event_id TEXT PRIMARY KEY,
+            invocation_id TEXT NOT NULL UNIQUE,
+            event_type TEXT NOT NULL,
+            payload JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+            attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+            available_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+            lease_until TIMESTAMPTZ,
+            delivered_at TIMESTAMPTZ
+        );
+        CREATE INDEX IF NOT EXISTS ucon_outbox_ready_idx
+            ON ucon_outbox(available_at, created_at)
+            WHERE delivered_at IS NULL;
         """
         with self._connect() as conn:
             for statement in ddl.split(";"):
