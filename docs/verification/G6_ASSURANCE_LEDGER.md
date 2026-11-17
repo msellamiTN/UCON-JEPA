@@ -9,10 +9,14 @@
 |---|---|---|
 | G6.1 | Threat model, TCB, trust boundaries, effect/revocation/policy-update semantics | Specification committed |
 | G6.2 | Explicit labelled transition system and state variables | Specification committed |
-| G6.3 | TLA+ model, safety invariants, temporal properties | Core model encoded; TLC execution pending |
-| G6.4 | TLC model-checking configurations, state-space results, counterexample traces | Not started |
+| G6.3 | TLA+ model, safety invariants, temporal properties | Core model encoded |
+| G6.4 | TLC model-checking configurations, state-space results, counterexample traces | Bounded check passed; four negative controls detected |
 | G6.5 | Refinement map to implementation controls and executable/property-based tests | Not started |
 | G6.6 | LaTeX assurance dossier, proof review, final traceability update | Not started |
+
+## G6.4 TLC results
+
+Workflow run 44199003346 passed. TLC version 2026.11.15.002146, Java Temurin 17.0.21+9, one worker: 13,441 states generated, 1,664 distinct states, zero remaining. All seven configured invariants passed. Mutants M1–M4 each triggered the expected invariant violation (revocation, policy freshness, UCON bypass, and commit-before-verification). Full record: docs/verification/G6.4_TLC_RESULTS.md. This is a finite abstract-model result only; implementation refinement and richer protocol modelling remain open.
 
 ## G6.3 TLA+ model status
 
