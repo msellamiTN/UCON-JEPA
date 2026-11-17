@@ -1,0 +1,522 @@
+% !TeX program = pdflatex
+% UCON-JEPA G4 formal proof dossier
+% Status: formal conditional proofs; assumptions and limitations are explicit.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{geometry}
+\geometry{margin=27mm}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+
+\newtheorem{definition}{Definition}[section]
+\newtheorem{assumption}{Assumption}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{proposition}{Proposition}[section]
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[section]
+\newtheorem{counterexample}{Counterexample}[section]
+
+\newcommand{\Adm}{\operatorname{Adm}}
+\newcommand{\Gate}{\operatorname{Gate}}
+\newcommand{\Commit}{\operatorname{Commit}}
+\newcommand{\Effect}{\operatorname{Effect}}
+\newcommand{\Uses}{\operatorname{Uses}}
+\newcommand{\MutAllowed}{\operatorname{MutAllowed}}
+\newcommand{\ValidCert}{\operatorname{ValidCert}}
+\newcommand{\Reach}{\operatorname{Reach}}
+\newcommand{\Bad}{\operatorname{Bad}}
+\newcommand{\Hist}{\operatorname{Hist}}
+\newcommand{\Prb}{\mathbb{P}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\CFG}{\mathcal{C}}
+
+\title{UCON-JEPA: G4 Formal Operational Semantics and Proof Dossier\\
+\large Authorization, Revocation, Policy Updates, Mutation Evidence, Concurrency, and Replay}
+\author{UCON-JEPA Research Project}
+\date{Version 0.1 --- 17 November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This dossier formalizes a versioned usage-control enforcement protocol for autonomous-agent operations and develops conditional proofs for authorization soundness, revocation safety, policy-update safety, lifecycle preservation, mutation consistency, durable intent logging, historical policy replay, concurrency invariant preservation, and independence of formal enforcement from learned prediction. The proof statements distinguish external-effect linearization from governance commit. All deployment-facing guarantees are explicitly conditional on enforcement, consistency, evidence, and concurrency assumptions. A separate selective-risk result is derived under a strong pointwise risk-domination assumption; the dossier does not claim that JEPA training or ordinary calibration establishes that assumption.
+\end{abstract}
+
+\tableofcontents
+
+\section{Scope and status}
+
+This document is a formal research specification, not a verified implementation report. A theorem labelled conditional is mathematically proved from its stated assumptions, but those assumptions must be discharged against a concrete system before the theorem can be claimed as a deployment guarantee.
+
+The central separation is:
+\begin{enumerate}[label=(\arabic*)]
+  \item formal authorization is authoritative;
+  \item predictive trajectory assessment is advisory;
+  \item external effects and governance-state commits are distinct events;
+  \item policy replay and future counterfactual prediction are distinct tasks.
+\end{enumerate}
+
+\section{Mathematical universes and configuration}
+
+Let the following sets be nonempty universes:
+\[
+\mathsf{Subj},\mathsf{Obj},\mathsf{Op},\mathsf{Cap},
+\mathsf{Obl},\mathsf{Pol},\mathsf{Inv},\mathsf{Ver},\mathsf{Event}.
+\]
+An invocation identifier is unique over the system lifetime.
+
+\begin{definition}[Typed action]
+An action request is
+\[
+a=(i,s,op,args,o,c,\pi),
+\]
+where $i\in\mathsf{Inv}$ is an invocation identifier, $s$ the logical subject, $op$ an operation, $args$ typed arguments, $o$ the target, $c\subseteq\mathsf{Cap}$ the capabilities used, and $\pi$ provenance/delegation context. The effective execution principal is denoted $\operatorname{EffPrincipal}(a)$ and need not equal the logical agent identity.
+\end{definition}
+
+\begin{definition}[Governance state]
+The authoritative governance state is
+\[
+G=(U,O,E,\Sigma,W,\Pi),
+\]
+representing subject/principal attributes, object/resource attributes, environment, sessions/capabilities/obligations, workflow history/state, and provenance/trust/lineage. Its versioned form is $\widehat G=(G,v_G)$.
+\end{definition}
+
+A policy is versioned as $\widehat{\mathcal P}=(\mathcal P,v_P)$. The authorization context version is $\kappa=(v_G,v_P)$.
+
+\begin{definition}[Global configuration]
+A global configuration is
+\[
+\CFG=(\widehat G,\widehat{\mathcal P},Q,X,L,A,M),
+\]
+where $Q$ is the request queue, $X$ invocation records, $L$ the revocation/policy-update ledger, $A$ the audit history, and $M$ mutation/effect evidence. An invocation record stores its action, lifecycle status, authorization context, execution evidence, and mutation evidence.
+\end{definition}
+
+The lifecycle statuses include
+\[
+\begin{split}
+\mathsf{Status}=\{&
+\mathsf{REQUESTED},\mathsf{DENIED},\mathsf{AUTHORIZED},
+\mathsf{PREPARED},\mathsf{EXECUTING},\mathsf{OBSERVED},\\
+&\mathsf{COMMITTED},\mathsf{ABORTED},\mathsf{COMPENSATING},
+\mathsf{COMPENSATED},\mathsf{CONTAINED}\}.
+\end{split}
+\]
+
+\section{Policy semantics}
+
+\begin{definition}[Formal admission]
+For a policy $\mathcal P$, governance state $G$, and action $a$, define
+\[
+\Adm_{\mathcal P}(G,a)=
+\operatorname{Auth}_{\mathcal P}(G,a)
+\land\operatorname{PreObl}_{\mathcal P}(G,a)
+\land\operatorname{Cond}_{\mathcal P}(G,a).
+\]
+Post-execution obligations are checked at their defined post-execution lifecycle point, not incorrectly required before execution.
+\end{definition}
+
+\begin{definition}[Mutation relation]
+The policy mutation semantics are a relation
+\[
+\mathcal M_{\mathcal P}\subseteq G\times a\times G'.
+\]
+We write
+\[
+\MutAllowed_{\mathcal P}(G,a,G')
+\iff (G,a,G')\in\mathcal M_{\mathcal P}.
+\]
+\end{definition}
+
+\begin{definition}[Trace]
+A finite history is a sequence of uniquely identified events
+$h=e_0,e_1,\ldots,e_n$. The order $e_j\prec_h e_k$ means that event $e_j$ precedes $e_k$ in $h$.
+\end{definition}
+
+For invocation $i$, distinguish authorization $A(i)$, optional preparation $P(i)$, external-effect linearization $E(i)$, verification $V(i)$, and governance commit $C(i)$. In general,
+\[
+A(i)\preceq_h E(i)\preceq_h V(i)\preceq_h C(i).
+\]
+For asynchronous tools, $E(i)$ is the external service's acceptance/irreversible-effect boundary, not necessarily completion of a remote job.
+
+\section{Certificates and execution gate}
+
+\begin{definition}[Authorization certificate]
+An authorization certificate is
+\[
+\Gamma_i=(i,a_i,s_i,o_i,c_i,v_G^i,v_P^i,d_i).
+\]
+It is valid only if it is bound to the exact invocation, action, effective principal, target, capabilities, and versions, and if
+\[
+d_i=1,\qquad
+\Adm_{\mathcal P_{v_P^i}}(G_{v_G^i},a_i)=1.
+\]
+\end{definition}
+
+\begin{definition}[Execution gate]
+Immediately before the external-effect event, the gate checks certificate validity, policy compatibility, state compatibility, capability activity, and invocation freshness:
+\[
+\begin{split}
+\Gate(i,h)\iff{}&
+\ValidCert(\Gamma_i)
+\land \operatorname{CurrentPolicyCompatible}(i,h)\\
+&\land\operatorname{CurrentStateCompatible}(i,h)
+\land\operatorname{CapabilitiesActive}(i,h)\\
+&\land\operatorname{InvocationNotConsumed}(i,h).
+\end{split}
+\]
+Strict version equality is the conservative compatibility policy. A more permissive compatibility relation requires its own soundness proof.
+\end{definition}
+
+\begin{assumption}[Complete protected-operation mediation]\label{a:gate}
+Every protected external effect crosses the execution gate:
+\[
+E(i)\in h\Rightarrow \Gate(i,h_{<E(i)}).
+\]
+\end{assumption}
+
+\begin{assumption}[Certificate integrity]\label{a:cert}
+Authorization certificates cannot be forged or rebound to another invocation, action, principal, target, or capability set.
+\end{assumption}
+
+\begin{assumption}[Authoritative state]\label{a:state}
+The gate reads authoritative policy, state, session, and capability versions.
+\end{assumption}
+
+\begin{assumption}[Policy evaluator correctness]\label{a:sem}
+The formal evaluator implements the declared admission semantics.
+\end{assumption}
+
+\begin{assumption}[Linearizable effect gate]\label{a:atomic}
+The gate and external-effect acceptance are atomic with respect to all policy, state, session, and capability changes relevant to authorization, or provide an equivalent linearizable protocol.
+\end{assumption}
+
+\section{Authorization soundness}
+
+\begin{theorem}[External-effect authorization soundness]\label{thm:auth}
+Under Assumptions~\ref{a:gate}--\ref{a:atomic}, every protected external effect is formally admitted under the policy and governance state effective at its effect boundary:
+\[
+E(i)\in h\Rightarrow
+\Adm_{\mathcal P_{E(i)}}(G_{E(i)},a_i)=1.
+\]
+\end{theorem}
+
+\begin{proof}
+Fix an arbitrary reachable history $h$ and invocation $i$ with $E(i)\in h$. By Assumption~\ref{a:gate}, $\Gate(i,h_{<E(i)})=1$. Expanding the gate gives a valid certificate, compatible policy and state versions, active capabilities, and a fresh invocation. Certificate integrity binds the evidence to the exact action and effective principal (Assumption~\ref{a:cert}). Authoritative version checking and linearizability ensure that the certificate's authorization context is valid at the effect boundary (Assumptions~\ref{a:state} and~\ref{a:atomic}). Evaluator correctness then gives
+\[
+\Adm_{\mathcal P_{E(i)}}(G_{E(i)},a_i)=1.
+\]
+Since $h$ and $i$ were arbitrary, the result follows.
+\end{proof}
+
+\begin{remark}
+The theorem does not establish policy completeness, policy desirability, absence of undiscovered bypasses, or honesty of the external service after acceptance. Those are separate obligations.
+\end{remark}
+
+\section{Revocation safety}
+
+\begin{definition}[Effective revocation]
+$R(c)$ denotes the event at which capability $c$ becomes effectively revoked in the authoritative state visible to all relevant execution gates. A revocation request is not, by itself, an effective revocation.
+\end{definition}
+
+\begin{assumption}[Linearizable revocation]\label{a:rev}
+Revocation and effect acceptance are linearizable; every gate observes the effective capability version, and external credentials cannot bypass the gate.
+\end{assumption}
+
+\begin{theorem}[Post-revocation effect exclusion]\label{thm:revoke}
+Under Assumptions~\ref{a:gate}, \ref{a:state}, \ref{a:atomic}, and~\ref{a:rev},
+\[
+R(c)\prec_h E(i)\land\operatorname{Uses}(i,c)
+\Rightarrow E(i)\notin h.
+\]
+\end{theorem}
+
+\begin{proof}
+Suppose for contradiction that $R(c)\prec_h E(i)$, $\operatorname{Uses}(i,c)$, and $E(i)\in h$. By linearizable revocation and atomic effect gating, the authoritative capability state at the gate marks $c$ as revoked. The gate therefore returns false because the capability is inactive. This contradicts Assumption~\ref{a:gate}, which requires a successful gate whenever the effect occurs. Thus no such effect exists.
+\end{proof}
+
+\begin{remark}
+An irreversible external effect occurring before effective revocation cannot be undone by this theorem. Cancellation, compensation, or containment is a distinct recovery concern.
+\end{remark}
+
+\section{Policy-update safety}
+
+\begin{assumption}[Linearizable policy update]\label{a:pol}
+Policy updates have a well-defined effective event, increment the authoritative policy version, and invalidate or revalidate pending certificates that are not compatible with the new policy.
+\end{assumption}
+
+\begin{theorem}[No stale-policy external effect]\label{thm:policy}
+Under Assumptions~\ref{a:gate}, \ref{a:state}, \ref{a:atomic}, and~\ref{a:pol}, if update $U(\mathcal P,\mathcal P')$ precedes $E(i)$, then
+\[
+\Adm_{\mathcal P'}(G_{E(i)},a_i)=1
+\]
+for every accepted effect, unless a separately proved compatibility relation applies.
+\end{theorem}
+
+\begin{proof}
+An old certificate has a policy version different from the authoritative version after the update. By Assumption~\ref{a:pol}, it is invalidated or must be revalidated. The execution gate checks the current policy version. Therefore an old incompatible certificate cannot pass. If the action is reauthorized, evaluator correctness establishes admission under $\mathcal P'$. Hence every accepted post-update effect satisfies the new policy's admission predicate.
+\end{proof}
+
+\section{Lifecycle invariant preservation}
+
+Let $\rightarrow_S$ be the allowed lifecycle relation. For example,
+\[
+\mathsf{REQUESTED}\rightarrow_S\mathsf{DENIED},\quad
+\mathsf{REQUESTED}\rightarrow_S\mathsf{AUTHORIZED},\quad
+\mathsf{AUTHORIZED}\rightarrow_S\mathsf{PREPARED},
+\]
+\[
+\mathsf{PREPARED}\rightarrow_S\mathsf{EXECUTING},\quad
+\mathsf{EXECUTING}\rightarrow_S\mathsf{OBSERVED},\quad
+\mathsf{OBSERVED}\rightarrow_S\mathsf{COMMITTED}.
+\]
+Abort, compensation, and containment transitions are separately specified.
+
+\begin{definition}[Lifecycle validity]
+A configuration is lifecycle-valid if every invocation has a permitted status and its recorded event history is consistent with $\rightarrow_S$.
+\end{definition}
+
+\begin{assumption}[Atomic lifecycle transition]\label{a:life}
+Every status-changing transition follows $\rightarrow_S$ and atomically updates the invocation record and its corresponding event.
+\end{assumption}
+
+\begin{theorem}[Lifecycle invariant preservation]\label{thm:lifecycle}
+If the initial configuration is lifecycle-valid, invocation identifiers are unique, and Assumption~\ref{a:life} holds, every reachable configuration is lifecycle-valid.
+\end{theorem}
+
+\begin{proof}
+Induct on the length of a transition sequence. The base case is the initial-validity assumption. For the inductive step, consider a transition from a valid configuration. If it does not modify an invocation record, validity is unchanged. Otherwise, Assumption~\ref{a:life} ensures the new status is related to the old status by $\rightarrow_S$ and the event and record are atomically consistent. Unique identifiers prevent ambiguity about which invocation is modified. Thus the successor configuration is valid. Induction completes the proof.
+\end{proof}
+
+\section{Mutation consistency}
+
+Let $G_{\mathrm{ext}}$ denote external state and $G_{\mathrm{gov}}$ governance-recorded state. They need not change atomically.
+
+\begin{assumption}[Trusted effect evidence]\label{a:evidence}
+For the operation class under consideration, the verifier's evidence is complete and correct with respect to the policy-relevant external effects.
+\end{assumption}
+
+\begin{assumption}[Commit verifier]\label{a:verifier}
+Only the mutation verifier can authorize a governance commit, and it correctly checks $\MutAllowed_{\mathcal P}(G,a,G')$.
+\end{assumption}
+
+\begin{theorem}[Verified mutation consistency]\label{thm:mutation}
+Under Assumptions~\ref{a:evidence} and~\ref{a:verifier}, for every fully verifiable operation class,
+\[
+\Commit(i,G')\Rightarrow
+\MutAllowed_{\mathcal P}(G,a_i,G').
+\]
+\end{theorem}
+
+\begin{proof}
+Take any committed invocation. By Assumption~\ref{a:verifier}, the commit rule can be entered only after successful verification of the mutation relation. By Assumption~\ref{a:evidence}, the verified evidence correctly represents the relevant external effects. The governance commit records the verified state. Therefore the committed mutation belongs to the policy-permitted mutation relation.
+\end{proof}
+
+\begin{remark}
+For partially observable tools, the theorem applies only to verified effects. It does not establish that no unobserved side effect occurred.
+\end{remark}
+
+\section{Durable intent correspondence}
+
+\begin{assumption}[Write-ahead intent protocol]\label{a:intent}
+A durable intent record uniquely bound to invocation $i$ is persisted before any external effect can be accepted. The log is append-only and recoverable, and every protected effect uses this protocol.
+\end{assumption}
+
+\begin{theorem}[External effect implies durable intent]\label{thm:intent}
+Under Assumption~\ref{a:intent},
+\[
+E(i)\in h\Rightarrow \operatorname{Intent}(i)\in A_h.
+\]
+\end{theorem}
+
+\begin{proof}
+Every external effect uses the intent protocol. The intent record is durably persisted before the effect. Append-only recoverability prevents its removal. Therefore every history containing the effect also contains the corresponding intent record.
+\end{proof}
+
+\section{Historical policy replay}
+
+For a finite dataset
+\[
+\mathcal D=\{(G_j,a_j,y_j)\}_{j=1}^n,
+\]
+define reference and implementation replay violation counts:
+\[
+R_{\mathrm{ref}}(\mathcal P',\mathcal D)
+=\sum_{j=1}^n\mathbf 1[
+\operatorname{Eval}_{\mathcal P'}(G_j,a_j)=0],
+\]
+\[
+R_{\mathrm{impl}}(\mathcal P',\mathcal D)
+=\sum_{j=1}^n\mathbf 1[
+\operatorname{Impl}_{\mathcal P'}(G_j,a_j)=0].
+\]
+
+\begin{theorem}[Replay equivalence]\label{thm:replay}
+If the implementation and reference evaluator agree on every recorded pair $(G_j,a_j)$, then
+\[
+R_{\mathrm{impl}}(\mathcal P',\mathcal D)
+=R_{\mathrm{ref}}(\mathcal P',\mathcal D).
+\]
+\end{theorem}
+
+\begin{proof}
+For every $j$, equality of evaluator outputs implies equality of the corresponding zero/nonzero indicator. Summing these equal indicators from $1$ to $n$ yields equality of the replay counts.
+\end{proof}
+
+\begin{counterexample}[Replay is not future safety]
+Every trace in a finite historical dataset may satisfy $\mathcal P'$, while an unseen trace involving a newly introduced tool or an unseen composition violates $\mathcal P'$. Therefore passing historical replay does not imply safety for all possible future traces.
+\end{counterexample}
+
+\section{Concurrency and invariant preservation}
+
+Let $R(i)$ and $W(i)$ be the read and write sets of invocation $i$. A conservative conflict relation holds when
+\[
+W(i)\cap R(j)\neq\varnothing
+\quad\lor\quad
+R(i)\cap W(j)\neq\varnothing
+\quad\lor\quad
+W(i)\cap W(j)\neq\varnothing.
+\]
+
+\begin{assumption}[Serializable execution]\label{a:serial}
+Every concurrent committed history is equivalent, with respect to the protected state and invariants, to a serial execution order. The conflict/dependency abstraction includes all policy-relevant predicate dependencies.
+\end{assumption}
+
+\begin{assumption}[Individual invariant preservation]\label{a:indpres}
+For invariant $I$, every valid individual commit preserves it:
+\[
+I(G)\land\operatorname{ValidCommit}(G,i,G')
+\Rightarrow I(G').
+\]
+\end{assumption}
+
+\begin{theorem}[Concurrency invariant preservation]\label{thm:serial}
+If $I(G_0)$, Assumptions~\ref{a:serial} and~\ref{a:indpres} hold, then every reachable committed state satisfies $I$.
+\end{theorem}
+
+\begin{proof}
+By serializability, any concurrent committed history is equivalent for the invariant to a serial ordering $i_1,\ldots,i_n$. Initially $I(G_0)$ holds. Individual invariant preservation implies, by induction over this serial order, that each successive committed state satisfies $I$. Equivalence transfers the invariant to the concurrent execution's resulting state.
+\end{proof}
+
+\begin{remark}
+Version checks alone do not establish serializability. The implementation must justify transaction isolation, locking, compare-and-swap, conditional updates, or another correct concurrency mechanism. Predicate conflicts must be included, not only direct field conflicts.
+\end{remark}
+
+\section{Predictor-independent enforcement}
+
+\begin{assumption}[Predictor isolation]\label{a:iso}
+The learned predictor cannot bypass, weaken, or modify the authoritative formal execution gate.
+\end{assumption}
+
+\begin{theorem}[Predictor-independent enforcement soundness]\label{thm:independent}
+Under the assumptions of Theorem~\ref{thm:auth} and Assumption~\ref{a:iso}, authorization soundness holds for every predictor implementation, including an arbitrarily inaccurate predictor.
+\end{theorem}
+
+\begin{proof}
+The proof of Theorem~\ref{thm:auth} depends only on certificate integrity, authoritative state and policy versions, evaluator semantics, the execution gate, and linearizable effect acceptance. It does not depend on predictive outputs. By Assumption~\ref{a:iso}, changing the predictor cannot change these premises. Therefore the authorization-soundness result is invariant under replacement or failure of the predictor.
+\end{proof}
+
+\section{Selective statistical risk: a conditional result}
+
+Let $X=(H,\pi,\mathcal P)$ be a prediction instance, $Y\in\{0,1\}$ the trajectory-violation indicator, and
+\[
+r(x)=\Pr(Y=1\mid X=x)
+\]
+the true conditional violation risk. Let $\widehat r(x)$ be a predictor-derived risk estimate.
+
+\begin{assumption}[Pointwise risk domination]\label{a:risk}
+For the deployment distribution of interest, there is a known $\delta\geq0$ such that
+\[
+r(x)\leq\widehat r(x)+\delta
+\]
+for almost every $x$.
+\end{assumption}
+
+For $\epsilon\geq0$, define the accepted set
+\[
+\mathcal A_\epsilon=\{x:\widehat r(x)\leq\epsilon\}.
+\]
+
+\begin{theorem}[Selective violation bound]\label{thm:selective}
+Under Assumption~\ref{a:risk} and $\Pr(X\in\mathcal A_\epsilon)>0$,
+\[
+\Pr(Y=1\mid X\in\mathcal A_\epsilon)
+\leq\epsilon+\delta.
+\]
+\end{theorem}
+
+\begin{proof}
+By the tower property,
+\[
+\Pr(Y=1\mid X\in\mathcal A_\epsilon)
+=\E[r(X)\mid X\in\mathcal A_\epsilon].
+\]
+Assumption~\ref{a:risk} gives
+\[
+\E[r(X)\mid X\in\mathcal A_\epsilon]
+\leq
+\E[\widehat r(X)+\delta\mid X\in\mathcal A_\epsilon].
+\]
+Every accepted $X$ satisfies $\widehat r(X)\leq\epsilon$. Hence the final expression is at most $\epsilon+\delta$.
+\end{proof}
+
+\begin{remark}[Critical open obligation]
+Assumption~\ref{a:risk} is strong and is not implied by JEPA's representation objective, low validation loss, AUROC, ensemble agreement, or ordinary expected calibration error. A finite-sample calibration/risk-control method must be selected and proved before Theorem~\ref{thm:selective} becomes a usable deployment guarantee.
+\end{remark}
+
+\section{Counterexample catalogue}
+
+\begin{longtable}{p{0.12\linewidth}p{0.31\linewidth}p{0.48\linewidth}}
+\toprule
+ID & Failure mode & Required control or limitation\\
+\midrule
+CE-01 & Old authorization reused after revocation & Linearizable revocation and effect-boundary revalidation.\\
+CE-02 & Two agents overspend using the same balance snapshot & Serializable execution, reservation, or atomic conditional update.\\
+CE-03 & Predictor reports safe but actual workflow is unsafe & Formal gate remains authoritative; measure predictive false negatives.\\
+CE-04 & Policy changes while an invocation is pending & Policy-version invalidation and reauthorization.\\
+CE-05 & External effect occurs before local commit; crash causes duplicate retry & Write-ahead intent, idempotency, reconciliation, compensation/containment.\\
+CE-06 & Latent representation aliases trusted and untrusted states & Explicit policy attributes and security-feature evaluation.\\
+CE-07 & Agent adapts its action sequence after policy revision & Separate fixed-action analysis from behaviour-policy counterfactuals.\\
+\bottomrule
+\end{longtable}
+
+\section{Proof status and open obligations}
+
+\begin{longtable}{p{0.15\linewidth}p{0.46\linewidth}p{0.29\linewidth}}
+\toprule
+Identifier & Result & Status\\
+\midrule
+THM-1 & External-effect authorization soundness & Proved conditionally\\
+THM-2 & Post-revocation effect exclusion & Proved conditionally\\
+THM-3 & No stale-policy external effect & Proved conditionally\\
+THM-4 & Lifecycle invariant preservation & Proved under transition discipline\\
+THM-5 & Verified mutation consistency & Proved conditionally\\
+THM-6 & Durable intent correspondence & Proved conditionally\\
+THM-7 & Historical replay equivalence & Proved\\
+THM-8 & Concurrency invariant preservation & Proved conditionally\\
+THM-9 & Predictor-independent enforcement soundness & Proved conditionally\\
+THM-10 & Selective risk bound under pointwise domination & Proved conditionally; premise unresolved\\
+PO-1 & Real gateway mediates every protected external effect & Open implementation obligation\\
+PO-2 & Revocation is linearizable across replicas and credentials & Open implementation obligation\\
+PO-3 & Effect evidence is trustworthy for each tool class & Open implementation obligation\\
+PO-4 & Conflict detection covers policy predicate dependencies & Open implementation obligation\\
+PO-5 & Finite-sample risk domination under deployment conditions & Open statistical obligation\\
+\bottomrule
+\end{longtable}
+
+\section{Interpretation and limitations}
+
+The formal theorems establish conditional enforcement properties. They do not establish JEPA's predictive advantage, the correctness of a policy specification, or the absence of unknown side effects. Tool classes with incomplete observability receive weaker mutation guarantees. Distributed systems require concrete linearizability and crash-recovery arguments. Statistical risk control requires an independently specified calibration procedure and distributional assumptions.
+
+\end{document}
