@@ -8,11 +8,15 @@
 | Stage | Deliverable | Status |
 |---|---|---|
 | G6.1 | Threat model, TCB, trust boundaries, effect/revocation/policy-update semantics | Specification committed |
-| G6.2 | Explicit labelled transition system and state variables | Not started |
+| G6.2 | Explicit labelled transition system and state variables | Specification committed |
 | G6.3 | TLA+ model, safety invariants, temporal properties | Not started |
 | G6.4 | TLC model-checking configurations, state-space results, counterexample traces | Not started |
 | G6.5 | Refinement map to implementation controls and executable/property-based tests | Not started |
 | G6.6 | LaTeX assurance dossier, proof review, final traceability update | Not started |
+
+## G6.2 transition-system status
+
+The LTS distinguishes Request, Authorize, predictive restriction, Prepare, GateCheck, Dispatch, Accept, Observe, Verify, Commit, revocation, policy publication, state mutation, crash, and recovery. Safety and liveness are separated. Tool-specific refinement obligations and ten counterexample scenarios are recorded in docs/research/G6.2_RUNTIME_TRANSITION_SYSTEM.md. No TLA+ model has yet been checked.
 
 ## G6.1 claims and status
 
