@@ -54,3 +54,8 @@ The generic fixed-sequence confidence-interval calibration principle is already 
 4. JEPA versus matched supervised/probabilistic predictors.
 5. OOD and policy/tool-version shift.
 6. Model-checking and implementation validation of G4 assumptions.
+
+
+## CI status — 2026-11-18
+
+GitHub Actions validation workflow is configured at .github/workflows/validation.yml. The observed run 44197562748 was still in progress at the last status check. Its Python dependency-install and LaTeX dependency-install steps had started; test execution and both LaTeX compilation steps had not yet completed. Therefore no CI pass is claimed in this ledger.
