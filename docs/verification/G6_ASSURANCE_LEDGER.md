@@ -9,10 +9,14 @@
 |---|---|---|
 | G6.1 | Threat model, TCB, trust boundaries, effect/revocation/policy-update semantics | Specification committed |
 | G6.2 | Explicit labelled transition system and state variables | Specification committed |
-| G6.3 | TLA+ model, safety invariants, temporal properties | Not started |
+| G6.3 | TLA+ model, safety invariants, temporal properties | Core model encoded; TLC execution pending |
 | G6.4 | TLC model-checking configurations, state-space results, counterexample traces | Not started |
 | G6.5 | Refinement map to implementation controls and executable/property-based tests | Not started |
 | G6.6 | LaTeX assurance dossier, proof review, final traceability update | Not started |
+
+## G6.3 TLA+ model status
+
+Committed formal/tla/G6_RuntimeEnforcement.tla and its TLC configuration. The model checks the core synchronous acceptance path, revocation/policy races, JEPA non-authority, verification-before-commit, and ambiguous lost-response handling. Scope and omissions are documented in docs/verification/G6.3_TLA_MODEL.md. TLC was not available in the current execution environment; no model-checking pass or state count is claimed. Negative mutant controls M1–M4 are required before validation.
 
 ## G6.2 transition-system status
 
