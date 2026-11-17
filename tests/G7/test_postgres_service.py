@@ -9,11 +9,11 @@ from uuid import uuid4
 
 try:
     import psycopg  # noqa: F401
+    from ucon_jepa.postgres_service import PostgresConfig, PostgresUconService
+    from ucon_jepa.transactional_service import IdempotencyConflict
 except ImportError:
     psycopg = None
-
-from ucon_jepa.transactional_service import IdempotencyConflict
-from ucon_jepa.postgres_service import PostgresConfig, PostgresUconService
+    PostgresConfig = PostgresUconService = IdempotencyConflict = None
 
 
 DSN = os.environ.get("UCON_JEPA_TEST_POSTGRES_DSN")
