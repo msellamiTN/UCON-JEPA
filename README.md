@@ -26,7 +26,8 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G5.6 | docs/research/G5.6_EVALUATION_PROTOCOL.md | Confirmatory protocol specified |
 | G6.1 | docs/research/G6.1_THREAT_MODEL_AND_TCB.md | Threat model, TCB, effect boundary, and JEPA non-authority specified; implementation evidence open |
 | G6.2 | docs/research/G6.2_RUNTIME_TRANSITION_SYSTEM.md | Labelled transition system and refinement obligations specified; TLA+ validation open |
-| G6.3 | formal/tla/G6_RuntimeEnforcement.tla | Core finite-state TLA+ model encoded; TLC execution pending |
+| G6.3 | formal/tla/G6_RuntimeEnforcement.tla | Core finite-state TLA+ model encoded |
+| G6.4 | docs/verification/G6.4_TLC_RESULTS.md | Bounded TLC run passed; four negative-control mutants detected; refinement open |
 
 ## Critical statistical boundary
 
