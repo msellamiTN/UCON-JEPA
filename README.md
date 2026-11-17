@@ -28,6 +28,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G6.2 | docs/research/G6.2_RUNTIME_TRANSITION_SYSTEM.md | Labelled transition system and refinement obligations specified; TLA+ validation open |
 | G6.3 | formal/tla/G6_RuntimeEnforcement.tla | Core finite-state TLA+ model encoded |
 | G6.4 | docs/verification/G6.4_TLC_RESULTS.md | Bounded TLC run passed; four negative-control mutants detected; refinement open |
+| G6.5 | docs/verification/G6.5_REFINEMENT_AND_TESTS.md | Refinement matrix specified; ten abstract runtime contract tests pass; production refinement open |
 
 ## Critical statistical boundary
 
@@ -47,6 +48,7 @@ No empirical result is claimed until the corresponding experiment is implemented
     docs/research/       G2, G3, G5, and G6 research specifications
     docs/verification/   proof ledger, validation protocol, counterexamples
     formal/tla/          TLA+ runtime-enforcement model and TLC configurations
+    tests/G6/            Executable abstract runtime contract tests
     paper/formal/        LaTeX formal and statistical dossiers
     experiments/G5/      risk-control code, tests, results
     .github/workflows/   automated validation
