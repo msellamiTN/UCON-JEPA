@@ -1,0 +1,30 @@
+name: G7 conditional adapter contract
+
+on:
+  push:
+    paths:
+      - "src/ucon_jepa/**"
+      - "tests/G7/**"
+      - ".github/workflows/g7-adapter-contract.yml"
+  pull_request:
+    paths:
+      - "src/ucon_jepa/**"
+      - "tests/G7/**"
+      - ".github/workflows/g7-adapter-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  adapter-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run G7 adapter contract tests
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests/G7 -p "test_*.py" -v
