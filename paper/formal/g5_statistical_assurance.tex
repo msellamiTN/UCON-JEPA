@@ -1,10 +1,9 @@
 \documentclass{article}
-\usepackage{amsmath,amssymb,amsthm}\n\\newtheorem{assumption}{Assumption}[section]\n\\newtheorem{lemma}{Lemma}[section]\n\\newtheorem{theorem}{Theorem}[section]
+\usepackage{amsmath,amssymb,amsthm}
+\newtheorem{assumption}{Assumption}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{theorem}{Theorem}[section]
 \begin{document}
-\section{G5}
-\[
-\Prb_{\mathrm{cal}}(\hat t=\mathrm{NULL}\lor R(\hat t)\le\epsilon)\ge1-\delta.
-\]
 \section{Workflow-episode estimand}
 Tool calls within an autonomous-agent workflow are dependent. The statistical unit is one bounded workflow episode, from admission to terminal outcome or timeout. Let $(Q_i,Y_i)$ be IID episode observations, where $Q_i$ is a frozen JEPA-derived risk-ranking score and $Y_i\in\{0,1\}$ indicates a policy-defined bad trajectory.
 \[
