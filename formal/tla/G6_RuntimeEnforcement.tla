@@ -86,9 +86,9 @@ Accept(i) ==
   /\ i \in Invocations
   /\ status[i] = "DISPATCHED"
   /\ gatePassed[i]
-  /\ i \in UCONAllowed
-  /\ certPolicy[i] = policyVersion
-  /\ ~capRevoked
+  /\ (\/~EnforceUCON \/ i \in UCONAllowed)
+  /\ (\/~EnforcePolicyFreshness \/ certPolicy[i] = policyVersion)
+  /\ (\/~EnforceRevocation \/ ~capRevoked)
   /\ accepted' = [accepted EXCEPT ![i] = TRUE]
   /\ acceptedWhileRevoked' =
        [acceptedWhileRevoked EXCEPT ![i] = capRevoked]
