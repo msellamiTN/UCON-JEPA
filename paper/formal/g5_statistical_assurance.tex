@@ -5,4 +5,36 @@
 \[
 \Prb_{\mathrm{cal}}(\hat t=\mathrm{NULL}\lor R(\hat t)\le\epsilon)\ge1-\delta.
 \]
+\section{Workflow-episode estimand}
+Tool calls within an autonomous-agent workflow are dependent. The statistical unit is one bounded workflow episode, from admission to terminal outcome or timeout. Let $(Q_i,Y_i)$ be IID episode observations, where $Q_i$ is a frozen JEPA-derived risk-ranking score and $Y_i\in\{0,1\}$ indicates a policy-defined bad trajectory.
+\[
+S_t=\mathbf 1\{Q\le t\},\quad R(t)=\Pr(Y=1\mid S_t=1).
+\]
+This is marginal selective risk among accepted episodes, not pointwise risk for every context.
+\section{Enforcement-induced censoring}
+Production UCON blocks prohibited effects. Therefore, absence of a completed production violation does not label a candidate workflow as intrinsically safe. We distinguish counterfactual trajectory violation under a declared sandbox/reference execution semantics, runtime intervention, and actual production incident. The theorem below controls the first only under the sandbox/reference distribution. Production transfer needs separate evidence.
+\section{Assumptions}
+\begin{assumption}[IID episodes]\label{a:iid} Calibration episodes are IID from a fixed target distribution, and deployment episodes follow the same distribution.\end{assumption}
+\begin{assumption}[Frozen model and semantics]\label{a:frozen} Predictor, score, rollout horizon, policy/tool scope, and outcome definition are fixed independently of calibration observations.\end{assumption}
+\begin{assumption}[Pre-specified thresholds]\label{a:grid} The finite ordered threshold set $\mathcal T=\{t_1<\cdots<t_K\}$ is fixed independently of calibration data or chosen on a disjoint pilot set.\end{assumption}
+\begin{assumption}[Complete labels]\label{a:labels} Every calibration episode has a correct binary outcome under the declared reference semantics.\end{assumption}
+\section{Exact confidence bound}
+For threshold $t_k$, let $n_k=\sum_i\mathbf 1\{Q_i\le t_k\}$ and $m_k=\sum_i\mathbf 1\{Q_i\le t_k\}Y_i$. Define the one-sided Clopper--Pearson upper bound
+\[
+U_k=\begin{cases}1,&n_k=0\text{ or }m_k=n_k,\\ F^{-1}_{\mathrm{Beta}(m_k+1,n_k-m_k)}(1-\delta),&0\le m_k<n_k.\end{cases}
+\]
+Certify candidate $t_k$ if $U_k\le\epsilon$. Inspect candidates in ascending order and stop at the first uncertified candidate; return the last certified threshold or NULL.
+\begin{lemma}[Conditional binomial law]\label{l:bin} Under Assumption~\ref{a:iid}, for fixed $t$ with $\Pr(S_t=1)>0$, $m(t)\mid n(t)=n\sim\operatorname{Binomial}(n,R(t))$.\end{lemma}
+\begin{proof} Classify each IID observation as unselected, selected with $Y=0$, or selected with $Y=1$. The category probabilities are $1-\pi(t)$, $\pi(t)(1-R(t))$, and $\pi(t)R(t)$. The counts are multinomial. Conditional on the selected count, the selected bad count is binomial with parameter $R(t)$.\end{proof}
+\begin{lemma}[Clopper--Pearson coverage]\label{l:cp} For each fixed $t$, $\Pr_{\mathcal D_{cal}}\{R(t)\le U(t;\delta)\}\ge1-\delta$.\end{lemma}
+\begin{proof} Condition on $n(t)=n>0$ and apply the one-sided exact binomial confidence bound to Lemma~\ref{l:bin}. Average over the random selected count. If $n(t)=0$, the upper bound is one and coverage is trivial.\end{proof}
+\section{Main theorem}
+\begin{theorem}[Finite-sample selective trajectory risk control]\label{thm:risk} Under Assumptions~\ref{a:iid}--\ref{a:labels}, the fixed-sequence procedure satisfies
+\[
+\Pr_{\mathcal D_{cal}}\left[\hat t=\mathrm{NULL}\ \lor\ R(\hat t)\le\epsilon\right]\ge1-\delta.
+\]
+\end{theorem}
+\begin{proof} If all candidates are population-safe, the result is immediate. Otherwise let $k^*=\min\{k:R(t_k)>\epsilon\}$ be the first population-unsafe candidate. If the procedure returns an unsafe threshold, it must have certified every candidate through its returned index, including $k^*$. Thus $U_{k^*}\le\epsilon<R(t_{k^*})$. The unsafe-return event is contained in the confidence-bound failure event $\{R(t_{k^*})>U_{k^*}\}$, whose probability is at most $\delta$ by Lemma~\ref{l:cp}.\end{proof}
+\section{Limitations and novelty boundary}
+The theorem is marginal over accepted episodes, not pointwise for each workflow. It does not guarantee zero unsafe episodes, arbitrary-shift robustness, or simulator-to-real transfer. Correlated tenant/session episodes require a cluster-level sampling unit or dependence-aware theory. The generic fixed-sequence confidence-interval method is existing work: Dong, Hao, and Shinnou (2026), Stats 9(5), 109, DOI 10.3390/stats9050109. UCON-JEPA must claim novelty only for the security-specific workflow estimand, policy semantics, enforcement integration, version/censoring treatment, and empirical validation.
 \end{document}
