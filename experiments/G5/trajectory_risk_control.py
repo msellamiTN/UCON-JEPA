@@ -167,6 +167,7 @@ def simulate(
             for method, decision in decisions.items():
                 if decision.threshold is None:
                     nulls[method] += 1
+                    coverages[method].append(0.0)
                     continue
                 idx = int(np.argmin(np.abs(thresholds - decision.threshold)))
                 failures[method] += int(true_risk[idx] > target_risk)
