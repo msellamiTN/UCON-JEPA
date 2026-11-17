@@ -38,7 +38,7 @@ jobs:
           curl --fail --location --retry 3 \
             https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar \
             --output .tools/tla2tools.jar
-          echo "0b57675323babad8ab3815b1db9f30e75dac1cdb  .tools/tla2tools.jar" | sha1sum --check -
+          echo "7e53aa636dac8a3cb0533f343115c0548e03fc0ce5edc7739becf58d3d0fb84f  .tools/tla2tools.jar" | sha256sum --check -
 
       - name: Parse TLA+ module
         shell: bash
