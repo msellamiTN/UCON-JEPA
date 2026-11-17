@@ -59,3 +59,8 @@ Claims not permitted without further evidence:
 - that predictive approval guarantees future safety;
 - that historical replay certifies unseen workflows;
 - that modelled counterfactuals are identified causal effects absent causal assumptions.
+
+
+## G2.5 Statistical-method novelty correction (G5 literature review)
+
+The generic fixed-sequence confidence-interval selective-risk calibration procedure is already published by Dong, Hao, and Shinnou (2026), DOI 10.3390/stats9050109. UCON-JEPA must not claim that generic method as novel. The candidate contribution is its security-specific adaptation to complete workflow trajectories, explicit policy-violation outcomes, enforcement-induced censoring, policy/tool version scope, and integration with formal UCON execution semantics. This is a required novelty constraint for the manuscript.
