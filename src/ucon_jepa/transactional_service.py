@@ -12,7 +12,7 @@ import hashlib
 import json
 import sqlite3
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 
 class IdempotencyConflict(RuntimeError):
@@ -40,9 +40,13 @@ class SqliteUconService:
     unreliable network filesystem or infer distributed-database guarantees.
     """
 
-    def __init__(self, database: str | Path, *, busy_timeout_ms: int = 10_000):
+    def __init__(
+        self, database: str | Path, *, busy_timeout_ms: int = 10_000,
+        fault_hook: Callable[[str], None] | None = None,
+    ):
         self.database = str(database)
         self.busy_timeout_ms = busy_timeout_ms
+        self.fault_hook = fault_hook
         if self.busy_timeout_ms <= 0:
             raise ValueError("busy_timeout_ms must be positive")
         self._initialize()
@@ -347,7 +351,11 @@ class SqliteUconService:
             row = conn.execute(
                 "SELECT * FROM invocations WHERE invocation_id=?", (invocation_id,)
             ).fetchone()
+            if self.fault_hook is not None:
+                self.fault_hook("before_commit")
             self._finish(conn)
+            if self.fault_hook is not None:
+                self.fault_hook("after_commit")
             return self._result(row)
         except Exception:
             self._rollback(conn)
