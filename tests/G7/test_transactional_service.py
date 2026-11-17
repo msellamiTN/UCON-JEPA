@@ -193,7 +193,7 @@ class TransactionalServiceTests(unittest.TestCase):
         snap = self.service.snapshot("doc-1")
         self.assertEqual(snap["resource_version"], 0)
         self.assertEqual(snap["payload"], b"initial")
-        result = self.command(invocation_id="crash-before")
+        result = self.command(invocation_id="crash-before", payload=b"new")
         self.assertEqual(result.outcome, "ACCEPTED")
 
     def test_lost_response_after_commit_recovers_original_receipt(self):
