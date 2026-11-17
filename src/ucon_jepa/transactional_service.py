@@ -148,7 +148,6 @@ class SqliteUconService:
                 "INSERT OR REPLACE INTO grants VALUES(?,?,?)",
                 (principal, action, resource_id),
             )
-            conn.execute("DELETE FROM revoked WHERE principal=?", (principal,))
             conn.execute(
                 "UPDATE control_state SET policy_version=policy_version+1, "
                 "authorization_epoch=authorization_epoch+1 WHERE singleton=1"
