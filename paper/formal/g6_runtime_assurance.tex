@@ -273,7 +273,7 @@ accepted[i]\Rightarrow i\in\UCONAllowed.
 \]
 \end{theorem}
 \begin{proof}
-Induction on the length of a finite execution trace. In the initial state, $accepted[i]=FALSE$ for every $i$. All transitions other than Accept leave accepted unchanged. The only transition that changes accepted from FALSE to TRUE is Accept(i), whose enabling guard includes $i\in\UCONAllowed$ because Assumption 1 fixes $EnforceUCON=\mathsf{TRUE}$. Therefore the property is preserved by every transition and holds in every reachable state.
+Induction on the length of a finite execution trace. In the initial state, $accepted[i]=FALSE$ for every $i$. All transitions other than Accept leave accepted unchanged. The only transition that changes accepted from FALSE to TRUE is Accept(i), whose enabling guard includes $i\in\UCONAllowed$ because the positive-enforcement assumption fixes $EnforceUCON=\mathsf{TRUE}$. Therefore the property is preserved by every transition and holds in every reachable state.
 \end{proof}
 
 \begin{theorem}[No acceptance after effective revocation]
@@ -283,7 +283,7 @@ accepted[i]\Rightarrow\neg acceptedWhileRevoked[i].
 \]
 \end{theorem}
 \begin{proof}
-Initially acceptedWhileRevoked is FALSE. Only Accept(i) writes this variable, and its guard requires $\neg capRevoked$. Because Assumption 1 fixes $EnforceRevocation=\mathsf{TRUE}$, the Accept guard requires $\neg capRevoked$. At that transition, acceptedWhileRevoked'[i] is assigned the current value of capRevoked, hence FALSE. EffectiveRevoke may set capRevoked to TRUE later, but it does not alter the recorded acceptance-time value. Thus the invariant is inductive.
+Initially acceptedWhileRevoked is FALSE. Only Accept(i) writes this variable, and its guard requires $\neg capRevoked$. Because the positive-enforcement assumption fixes $EnforceRevocation=\mathsf{TRUE}$, the Accept guard requires $\neg capRevoked$. At that transition, acceptedWhileRevoked'[i] is assigned the current value of capRevoked, hence FALSE. EffectiveRevoke may set capRevoked to TRUE later, but it does not alter the recorded acceptance-time value. Thus the invariant is inductive.
 \end{proof}
 
 \begin{remark}
@@ -297,7 +297,7 @@ accepted[i]\Rightarrow acceptedWithFreshPolicy[i].
 \]
 \end{theorem}
 \begin{proof}
-Initially acceptedWithFreshPolicy is FALSE. Only Accept(i) writes it. Because Assumption 1 fixes $EnforcePolicyFreshness=\mathsf{TRUE}$, the guard of Accept requires $certPolicy[i]=policyVersion$, and the transition stores exactly this equality as acceptedWithFreshPolicy'[i]. Therefore the property is inductive.
+Initially acceptedWithFreshPolicy is FALSE. Only Accept(i) writes it. Because the positive-enforcement assumption fixes $EnforcePolicyFreshness=\mathsf{TRUE}$, the guard of Accept requires $certPolicy[i]=policyVersion$, and the transition stores exactly this equality as acceptedWithFreshPolicy'[i]. Therefore the property is inductive.
 \end{proof}
 
 \begin{theorem}[Commit requires verified evidence]
@@ -307,14 +307,14 @@ committed[i]\Rightarrow verified[i]\land observed[i].
 \]
 \end{theorem}
 \begin{proof}
-The initial state has committed[i]=FALSE. Only Commit(i) changes committed to TRUE. Because Assumption 1 fixes $EnforceVerification=\mathsf{TRUE}$, its enabling condition requires status[i]=VERIFIED, verified[i], and observed[i]. No other transition changes committed. The implication is therefore preserved.
+The initial state has committed[i]=FALSE. Only Commit(i) changes committed to TRUE. Because the positive-enforcement assumption fixes $EnforceVerification=\mathsf{TRUE}$, its enabling condition requires status[i]=VERIFIED, verified[i], and observed[i]. No other transition changes committed. The implication is therefore preserved.
 \end{proof}
 
 \begin{theorem}[JEPA non-authority]
 Changing only the JEPA output cannot make a UCON-denied invocation acceptable.
 \end{theorem}
 \begin{proof}
-The authorization and acceptance guards depend on the UCON admission set, certificate policy version, revocation state, lifecycle state, and gate flag. They do not depend on jepa[i]. Assumption 1 fixes $EnforceUCON=\mathsf{TRUE}$. A ChangeJepa transition changes only the JEPA output variable. Hence it leaves the projection of the state onto all authorization variables unchanged and cannot enable an Accept transition for an invocation outside $\UCONAllowed$.
+The authorization and acceptance guards depend on the UCON admission set, certificate policy version, revocation state, lifecycle state, and gate flag. They do not depend on jepa[i]. the positive-enforcement assumption fixes $EnforceUCON=\mathsf{TRUE}$. A ChangeJepa transition changes only the JEPA output variable. Hence it leaves the projection of the state onto all authorization variables unchanged and cannot enable an Accept transition for an invocation outside $\UCONAllowed$.
 \end{proof}
 
 \begin{theorem}[Unknown outcome is not committed]
