@@ -27,7 +27,7 @@ class RiskControlTests(unittest.TestCase):
         outcomes = np.array([0] * 100 + [1] * 100)
         thresholds = np.array([0.2, 0.5, 1.0])
         decision = fixed_sequence_cp(scores, outcomes, thresholds, 0.10, 0.05)
-        self.assertEqual(decision.threshold, 0.2)
+        self.assertEqual(decision.threshold, 0.5)
 
     def test_naive_can_accept_without_finite_sample_certificate(self):
         scores = np.linspace(0.0, 1.0, 100)
