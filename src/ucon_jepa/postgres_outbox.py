@@ -11,8 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Any
 
-from psycopg.types.json import Jsonb
-
 from .postgres_service import PostgresConfig, PostgresUconService
 
 
@@ -65,12 +63,28 @@ class PostgresOutbox:
                     for row in rows
                 ]
 
-    def acknowledge(self, event_id: str) -> bool:
+    def acknowledge(self, event_id: str, *, attempts: int) -> bool:
+        """Acknowledge only the current lease generation (fencing stale workers)."""
         with self.service._connect() as conn:
             row = conn.execute(
                 "UPDATE ucon_outbox SET delivered_at=clock_timestamp(),lease_until=NULL "
-                "WHERE event_id=%s AND delivered_at IS NULL RETURNING event_id",
-                (event_id,),
+                "WHERE event_id=%s AND attempts=%s AND delivered_at IS NULL "
+                "RETURNING event_id",
+                (event_id, attempts),
+            ).fetchone()
+            return row is not None
+
+    def reschedule(self, event_id: str, *, attempts: int,
+                   delay_seconds: int = 5) -> bool:
+        if delay_seconds < 0:
+            raise ValueError("delay_seconds must be non-negative")
+        with self.service._connect() as conn:
+            row = conn.execute(
+                "UPDATE ucon_outbox SET lease_until=NULL, "
+                "available_at=clock_timestamp() + (%s * INTERVAL '1 second') "
+                "WHERE event_id=%s AND attempts=%s AND delivered_at IS NULL "
+                "RETURNING event_id",
+                (delay_seconds, event_id, attempts),
             ).fetchone()
             return row is not None
 
@@ -82,9 +96,11 @@ class PostgresOutbox:
         for event in events:
             try:
                 send(event)
-                self.acknowledge(event.event_id)
+                self.acknowledge(event.event_id, attempts=event.attempts)
                 sent += 1
             except Exception:
+                self.reschedule(event.event_id, attempts=event.attempts,
+                                delay_seconds=min(300, 2 ** min(event.attempts, 8)))
                 failed += 1
         return sent, failed
 
