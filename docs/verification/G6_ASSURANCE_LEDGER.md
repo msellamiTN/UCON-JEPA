@@ -12,11 +12,11 @@
 | G6.3 | TLA+ model, safety invariants, temporal properties | Core model encoded |
 | G6.4 | TLC model-checking configurations, state-space results, counterexample traces | Bounded check passed; four negative controls detected |
 | G6.5 | Refinement map to implementation controls and executable/property-based tests | Abstract reference tests pass; production refinement open |
-| G6.6 | LaTeX assurance dossier, proof review, final traceability update | Dossier and claim ledger committed; LaTeX CI pending |
+| G6.6 | LaTeX assurance dossier, proof review, final traceability update | Dossier compiles in full CI; stricter three-pass cross-reference validation pending |
 
 ## G6.6 proof review and assurance dossier
 
-The full LaTeX dossier is paper/formal/g6_runtime_assurance.tex. Claim-by-claim proof status and open obligations are in docs/verification/G6.6_PROOF_REVIEW.md. The dossier records the abstract proofs, TLC evidence, negative controls, Python tests, and deployment limitations. CI compilation was added; no LaTeX pass is claimed until the current workflow finishes.
+The full LaTeX dossier is paper/formal/g6_runtime_assurance.tex. Claim-by-claim proof status and open obligations are in docs/verification/G6.6_PROOF_REVIEW.md. The dossier records the abstract proofs, TLC evidence, negative controls, Python tests, and deployment limitations. Full repository workflow 44200176395 passed all three jobs, including two-pass compilation of G4, G6, and G5. A stricter three-pass cross-reference gate was then added; its current run 44200529810 is still in progress. The theorem proofs now explicitly assume all four enforcement switches are TRUE in the positive configuration.
 
 ## G6.5 refinement and contract tests
 

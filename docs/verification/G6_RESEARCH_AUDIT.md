@@ -3,7 +3,7 @@
 **Audit date:** 18 November 2026  
 **Repository:** msellamiTN/UCON-JEPA  
 **Audited branch:** main  
-**Status:** research workflow applied; LaTeX rerun pending
+**Status:** research workflow applied; two-pass full CI passed; stricter three-pass CI pending
 
 ## 1. Workflow availability and application
 
@@ -38,7 +38,7 @@ The project-native workflow defines eight distinct review passes: research archi
 
 ### 3.1 Local Python reference-harness execution
 
-The ten test cases from tests/G6/test_runtime_contract.py were independently executed in the available Python analysis runtime:
+A local, independently transcribed mirror of the ten test cases from tests/G6/test_runtime_contract.py was executed in the available Python analysis runtime:
 
 - Python 3.13.5;
 - Linux x86_64;
@@ -46,7 +46,7 @@ The ten test cases from tests/G6/test_runtime_contract.py were independently exe
 - 10 passed;
 - elapsed test time: 0.007 seconds.
 
-This is a local execution of the committed reference-harness logic. It is supplemental to, not a replacement for, the official Python 3.12 GitHub Actions run 44199165327 and the full repository run 44199319116.
+This is a local execution of the same reference-harness logic, not a direct invocation of the checked-in file. It is supplemental to, not a replacement for, the official Python 3.12 GitHub Actions run 44199165327 and the full repository run 44200176395.
 
 ### 3.2 TLC formal model
 
@@ -63,18 +63,11 @@ This result applies only to the finite abstract synchronous-acceptance model and
 
 ### 3.3 Full repository CI
 
-The latest full repository runs before the macro correction had:
-- G5 Python tests: passed;
-- G6 runtime contract tests: passed;
-- G4 LaTeX build: passed;
-- G6 LaTeX build: failed due to F-G6-01;
-- G5 LaTeX build: not reached after the G6 fatal error in the sequential LaTeX job.
-
-The macro correction requires a new run. No green full-pipeline claim is made until that run completes.
+Full repository run 44200176395 on commit 15e137c47471ee5d93d9311a1cb33ce039997a29 passed all three jobs: G5 Python tests, G6 runtime contract tests, and LaTeX builds for G4, G6, and G5. The G6 PDF was produced as a 10-page document. The two-pass LaTeX run showed first-pass reference warnings for G4/G5; the second pass removed the undefined-reference warnings, although a label-changed warning remained. To tighten the gate, commit 868e4ca113aec3a0007e0dc44e4c16d76f62784a changed CI to three passes and explicit unresolved-reference detection. The latest theorem-assumption edits are in commit 899baac89f748ff8ba01ec2aa5c65e23405d1f9a. Workflow run 44200529810 is currently validating that latest source and stricter gate; its Python jobs have passed and the LaTeX job is still installing TeX Live.
 
 ## 4. Mathematical and formal validity review
 
-The G6 proof arguments are valid for the stated transition relation:
+The G6 proof arguments are valid for the stated transition relation under the explicit positive-enforcement assumption added to the LaTeX dossier: EnforceUCON=TRUE, EnforceRevocation=TRUE, EnforcePolicyFreshness=TRUE, and EnforceVerification=TRUE. Without these flags, the corresponding mutant configurations intentionally violate the relevant safety properties. Under that premise:
 
 - No unauthorized acceptance follows because only Accept sets the accepted flag and its guard requires membership in UCONAllowed.
 - Revocation safety follows because Accept rechecks the effective revocation state and records the value at the acceptance transition.
@@ -104,7 +97,7 @@ The ten Python tests are reference-harness tests. They are not a production MCP 
 
 **G6 abstract assurance:** evidence-backed, bounded, and conditionally valid under its explicit transition semantics.
 
-**G6 LaTeX release gate:** open until the corrected source compiles in the full CI pipeline.
+**G6 LaTeX release gate:** the corrected source passed the two-pass full CI build in run 44200176395; the stricter three-pass/no-undefined-reference gate is pending run 44200529810.
 
 **Production implementation assurance:** open.
 
