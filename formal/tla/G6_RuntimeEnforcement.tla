@@ -139,6 +139,19 @@ TimeoutUnknown(i) ==
        verified, committed, capRevoked, policyVersion,
        acceptedPolicy, jepa>>
 
+
+LoseAcceptanceResponse(i) ==
+  /\ i \in Invocations
+  /\ status[i] = "ACCEPTED"
+  /\ accepted[i]
+  /\ status' = [status EXCEPT ![i] = "UNKNOWN"]
+  /\ outcomeUnknown' = [outcomeUnknown EXCEPT ![i] = TRUE]
+  /\ outcome' = [outcome EXCEPT ![i] = "UNKNOWN"]
+  /\ UNCHANGED <<certPolicy, gatePassed, accepted,
+       acceptedWhileRevoked, acceptedWithFreshPolicy, observed,
+       verified, committed, capRevoked, policyVersion,
+       acceptedPolicy, jepa>>
+
 EffectiveRevoke ==
   /\ ~capRevoked
   /\ capRevoked' = TRUE
@@ -179,6 +192,7 @@ Next ==
   \/ \E i \in Invocations : Verify(i)
   \/ \E i \in Invocations : Commit(i)
   \/ \E i \in Invocations : TimeoutUnknown(i)
+  \/ \E i \in Invocations : LoseAcceptanceResponse(i)
   \/ EffectiveRevoke
   \/ PublishPolicy
   \/ \E i \in Invocations : ChangeJepa(i)
@@ -210,10 +224,6 @@ NoAcceptanceAfterRevocation ==
 
 NoStalePolicyAcceptance ==
   \A i \in Invocations : accepted[i] => acceptedWithFreshPolicy[i]
-
-AtMostOneAcceptance ==
-  \A i \in Invocations : accepted[i] => status[i] \in
-    {"ACCEPTED", "OBSERVED", "VERIFIED", "COMMITTED"}
 
 CommitRequiresVerification ==
   \A i \in Invocations : committed[i] => verified[i] /\ observed[i]
