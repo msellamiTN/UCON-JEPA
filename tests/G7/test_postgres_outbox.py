@@ -73,6 +73,19 @@ class PostgresOutboxTests(unittest.TestCase):
             ).fetchone()["n"]
         self.assertEqual(count, 1)
 
+    def test_receiver_rejects_same_event_id_with_changed_payload(self):
+        invocation, _ = self.create_accepted_event()
+        events = self.outbox.claim(limit=100, lease_seconds=30)
+        event = next(item for item in events if item.event_id == invocation)
+        self.assertTrue(self.receiver.process(event))
+        altered = OutboxEvent(
+            event_id=event.event_id, event_type=event.event_type,
+            payload={**event.payload, "resource_version": event.payload["resource_version"] + 99},
+            attempts=event.attempts,
+        )
+        with self.assertRaisesRegex(ValueError, "different event content"):
+            self.receiver.process(altered)
+
     def test_crash_after_send_before_ack_causes_redelivery_but_no_duplicate_effect(self):
         invocation, _ = self.create_accepted_event()
         first_claim = self.outbox.claim(limit=100, lease_seconds=0)
