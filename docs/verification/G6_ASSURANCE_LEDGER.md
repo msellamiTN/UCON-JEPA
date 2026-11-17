@@ -11,8 +11,12 @@
 | G6.2 | Explicit labelled transition system and state variables | Specification committed |
 | G6.3 | TLA+ model, safety invariants, temporal properties | Core model encoded |
 | G6.4 | TLC model-checking configurations, state-space results, counterexample traces | Bounded check passed; four negative controls detected |
-| G6.5 | Refinement map to implementation controls and executable/property-based tests | Not started |
+| G6.5 | Refinement map to implementation controls and executable/property-based tests | Abstract reference tests pass; production refinement open |
 | G6.6 | LaTeX assurance dossier, proof review, final traceability update | Not started |
+
+## G6.5 refinement and contract tests
+
+The refinement matrix maps complete mediation, identity binding, certificate integrity, authoritative state, evaluator correctness, effect linearizability, revocation, policy updates, evidence, durable intent, serializability, predictor isolation, and statistical scope to implementation controls and tests. Ten abstract runtime contract tests passed in workflow run 44199165327. Full report: docs/verification/G6.5_REFINEMENT_AND_TESTS.md. The tests execute a reference harness only; no production adapter has yet been selected or validated.
 
 ## G6.4 TLC results
 
