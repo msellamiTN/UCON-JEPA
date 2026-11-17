@@ -1,0 +1,10 @@
+scenario,method,repetitions,sample_size,target_risk,delta,unsafe_return_rate,mean_acceptance_probability,null_rate,mc_failure_upper95
+monotone,fixed_sequence_cp,2000,1500,0.10,0.05,0.0220,0.33695,0.0665,0.028197
+monotone,bonferroni_cp,2000,1500,0.10,0.05,0.0005,0.222225,0.1915,0.003145
+monotone,naive_empirical,2000,1500,0.10,0.05,0.3915,0.5048,0.0,0.409811
+nonmonotone,fixed_sequence_cp,2000,1500,0.10,0.05,0.0025,0.0061,0.9865,0.005249
+nonmonotone,bonferroni_cp,2000,1500,0.10,0.05,0.0,0.182775,0.495,0.001497
+nonmonotone,naive_empirical,2000,1500,0.10,0.05,0.1995,0.66565,0.0,0.214771
+infeasible,fixed_sequence_cp,2000,1500,0.10,0.05,0.0020,0.0002,0.998,0.004571
+infeasible,bonferroni_cp,2000,1500,0.10,0.05,0.0,0.0,1.0,0.001497
+infeasible,naive_empirical,2000,1500,0.10,0.05,0.0990,0.01475,0.901,0.110675
