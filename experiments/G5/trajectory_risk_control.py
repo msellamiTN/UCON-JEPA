@@ -182,10 +182,14 @@ def simulate(
                     "target_risk": target_risk,
                     "delta": delta,
                     "unsafe_return_rate": failures[method] / repetitions,
-                    "mean_selected_threshold": (
+                    "mean_acceptance_probability": (
                         float(np.mean(coverages[method])) if coverages[method] else 0.0
                     ),
                     "null_rate": nulls[method] / repetitions,
+                    "mc_failure_upper95": (
+                        1.0 if failures[method] == repetitions else
+                        float(beta.ppf(0.95, failures[method] + 1, repetitions - failures[method]))
+                    ),
                 }
             )
     return output
@@ -220,7 +224,7 @@ def main() -> None:
             row["scenario"],
             row["method"],
             f"unsafe={row['unsafe_return_rate']:.4f}",
-            f"mean_threshold={row['mean_selected_threshold']:.4f}",
+            f"mean_acceptance={row['mean_acceptance_probability']:.4f}",
             f"null={row['null_rate']:.4f}",
         )
     print(f"wrote {args.output}")
