@@ -1,10 +1,16 @@
 ---------------- MODULE G6_RuntimeEnforcement ----------------
 EXTENDS Naturals, FiniteSets
 
-CONSTANTS Invocations, UCONAllowed
+CONSTANTS Invocations, UCONAllowed,
+          EnforceUCON, EnforceRevocation,
+          EnforcePolicyFreshness, EnforceVerification
 
 ASSUME /\ Invocations # {}
        /\ UCONAllowed \subseteq Invocations
+       /\ EnforceUCON \in BOOLEAN
+       /\ EnforceRevocation \in BOOLEAN
+       /\ EnforcePolicyFreshness \in BOOLEAN
+       /\ EnforceVerification \in BOOLEAN
 
 Statuses == {"NEW", "AUTHORIZED", "DENIED", "DISPATCHED",
              "ACCEPTED", "OBSERVED", "VERIFIED",
@@ -44,7 +50,7 @@ Init ==
 Authorize(i) ==
   /\ i \in Invocations
   /\ status[i] = "NEW"
-  /\ i \in UCONAllowed
+  /\ (\/~EnforceUCON \/ i \in UCONAllowed)
   /\ status' = [status EXCEPT ![i] = "AUTHORIZED"]
   /\ certPolicy' = [certPolicy EXCEPT ![i] = policyVersion]
   /\ UNCHANGED <<gatePassed, accepted, acceptedWhileRevoked,
@@ -55,6 +61,7 @@ Authorize(i) ==
 Deny(i) ==
   /\ i \in Invocations
   /\ status[i] = "NEW"
+  /\ EnforceUCON
   /\ i \notin UCONAllowed
   /\ status' = [status EXCEPT ![i] = "DENIED"]
   /\ UNCHANGED <<certPolicy, gatePassed, accepted,
@@ -65,9 +72,9 @@ Deny(i) ==
 GateCheck(i) ==
   /\ i \in Invocations
   /\ status[i] = "AUTHORIZED"
-  /\ i \in UCONAllowed
-  /\ certPolicy[i] = policyVersion
-  /\ ~capRevoked
+  /\ (\/~EnforceUCON \/ i \in UCONAllowed)
+  /\ (\/~EnforcePolicyFreshness \/ certPolicy[i] = policyVersion)
+  /\ (\/~EnforceRevocation \/ ~capRevoked)
   /\ gatePassed' = [gatePassed EXCEPT ![i] = TRUE]
   /\ status' = [status EXCEPT ![i] = "DISPATCHED"]
   /\ UNCHANGED <<certPolicy, accepted, acceptedWhileRevoked,
@@ -117,9 +124,12 @@ Verify(i) ==
 
 Commit(i) ==
   /\ i \in Invocations
-  /\ status[i] = "VERIFIED"
-  /\ verified[i]
-  /\ observed[i]
+  /\ \/ /\ status[i] = "VERIFIED"
+        /\ verified[i]
+        /\ observed[i]
+     \/ /\ ~EnforceVerification
+        /\ status[i] = "OBSERVED"
+        /\ observed[i]
   /\ committed' = [committed EXCEPT ![i] = TRUE]
   /\ status' = [status EXCEPT ![i] = "COMMITTED"]
   /\ outcome' = [outcome EXCEPT ![i] = "COMMITTED"]
