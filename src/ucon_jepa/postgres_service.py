@@ -261,7 +261,7 @@ class PostgresUconService:
                 )
                 if self.fault_hook:
                     self.fault_hook("before_commit")
-            # psycopg connection context commits on clean exit.
+            conn.commit()
             if self.fault_hook:
                 self.fault_hook("after_commit")
             return MutationResult(
