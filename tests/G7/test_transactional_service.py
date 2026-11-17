@@ -176,5 +176,50 @@ class TransactionalServiceTests(unittest.TestCase):
             self.assertEqual(self.service.snapshot("doc-1")["resource_version"], 0)
 
 
+
+    def test_fault_before_commit_rolls_back_everything(self):
+        def fail(stage):
+            if stage == "before_commit":
+                raise RuntimeError("simulated process failure before commit")
+
+        crashing = SqliteUconService(self.db, fault_hook=fail)
+        with self.assertRaisesRegex(RuntimeError, "before commit"):
+            crashing.mutate(
+                invocation_id="crash-before", principal="agent-A", action="write",
+                resource_id="doc-1", expected_resource_version=0,
+                expected_policy_version=self.policy_version,
+                expected_authorization_epoch=self.epoch, payload=b"new",
+            )
+        snap = self.service.snapshot("doc-1")
+        self.assertEqual(snap["resource_version"], 0)
+        self.assertEqual(snap["payload"], b"initial")
+        result = self.command(invocation_id="crash-before")
+        self.assertEqual(result.outcome, "ACCEPTED")
+
+    def test_lost_response_after_commit_recovers_original_receipt(self):
+        def fail(stage):
+            if stage == "after_commit":
+                raise RuntimeError("simulated response loss after commit")
+
+        crashing = SqliteUconService(self.db, fault_hook=fail)
+        with self.assertRaisesRegex(RuntimeError, "after commit"):
+            crashing.mutate(
+                invocation_id="crash-after", principal="agent-A", action="write",
+                resource_id="doc-1", expected_resource_version=0,
+                expected_policy_version=self.policy_version,
+                expected_authorization_epoch=self.epoch, payload=b"new",
+            )
+        self.assertEqual(self.service.snapshot("doc-1")["resource_version"], 1)
+        recovered = self.service.mutate(
+            invocation_id="crash-after", principal="agent-A", action="write",
+            resource_id="doc-1", expected_resource_version=0,
+            expected_policy_version=self.policy_version,
+            expected_authorization_epoch=self.epoch, payload=b"new",
+        )
+        self.assertEqual(recovered.outcome, "ACCEPTED")
+        self.assertTrue(recovered.replayed)
+        self.assertEqual(self.service.snapshot("doc-1")["resource_version"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
