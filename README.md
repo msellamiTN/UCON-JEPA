@@ -4,6 +4,8 @@
 
 This repository is the version-controlled research source of truth for UCON-JEPA. Formal claims, assumptions, proofs, counterexamples, experimental protocols, results, and paper versions must be traceable to committed artifacts.
 
+**Research process:** follow [RESEARCH_AGENT_WORKFLOW.md](docs/research/RESEARCH_AGENT_WORKFLOW.md) for literature, proof, formal-methods, runtime, experimental, adversarial, and release audits.
+
 ## Research position
 
 UCON-JEPA investigates whether action-conditioned predictive representations can improve anticipation of security violations in compositional autonomous-agent workflows while preserving authoritative formal usage-control enforcement.
