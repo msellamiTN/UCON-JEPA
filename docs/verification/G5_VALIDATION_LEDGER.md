@@ -59,3 +59,5 @@ The generic fixed-sequence confidence-interval calibration principle is already 
 ## CI status — 2026-11-18
 
 GitHub Actions validation workflow is configured at .github/workflows/validation.yml. The observed run 44197562748 was still in progress at the last status check. Its Python dependency-install and LaTeX dependency-install steps had started; test execution and both LaTeX compilation steps had not yet completed. Therefore no CI pass is claimed in this ledger.
+
+Latest LaTeX/CI source commit: f84ea929842420c6e0add922af7f2ac8b17cdbe0. GitHub Actions run 44197906113 was queued at the last check; the LaTeX dependency-install step was still running on an earlier run. No CI pass is claimed. The G5 LaTeX source was remotely fetched and its preamble/theorem environments manually inspected; final compiler validation remains pending.
