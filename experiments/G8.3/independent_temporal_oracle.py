@@ -51,7 +51,10 @@ def oracle(events: list[dict], entitlements: dict | None = None) -> dict:
                     "event": kind, "allowed": True, "reason": None}
 
         if kind == "policy_update":
-            version = event["version"]
+            if event["actor"] == "security_admin" and "admin" in rights.get(event["actor"], []):
+                version = event["version"]
+            else:
+                decision.update(allowed=False, reason="policy_update_requires_admin_entitlement")
 
         elif kind == "grant":
             rights_requested = event["scopes"]
@@ -64,7 +67,8 @@ def oracle(events: list[dict], entitlements: dict | None = None) -> dict:
             )
             if valid:
                 grants[event["grant_id"]] = {
-                    "who": event["principal"], "rights": list(rights_requested),
+                    "who": event["principal"], "issuer": event["actor"],
+                    "rights": list(rights_requested),
                     "tenant": event["tenant"], "until": event["expires_at"],
                     "version": version,
                 }
@@ -73,10 +77,14 @@ def oracle(events: list[dict], entitlements: dict | None = None) -> dict:
 
         elif kind == "revoke":
             grant_id = event["grant_id"]
-            if grant_id not in grants:
+            grant = grants.get(grant_id)
+            if grant is None:
                 decision.update(allowed=False, reason="unknown_grant")
-            else:
+            elif (event["actor"] == grant["issuer"] or
+                  (event["actor"] == "security_admin" and "admin" in rights.get(event["actor"], []))):
                 revoked.add(grant_id)
+            else:
+                decision.update(allowed=False, reason="revoke_requires_grant_issuer_or_admin")
 
         elif kind == "delegate":
             source_id = event["source_grant_id"]
@@ -85,6 +93,7 @@ def oracle(events: list[dict], entitlements: dict | None = None) -> dict:
             valid = bool(
                 source is not None
                 and source_id not in revoked
+                and event["actor"] == source["who"]
                 and when < source["until"]
                 and source["version"] == version
                 and set(scopes).issubset(set(source["rights"]))
@@ -93,7 +102,8 @@ def oracle(events: list[dict], entitlements: dict | None = None) -> dict:
             )
             if valid:
                 grants[event["grant_id"]] = {
-                    "who": event["principal"], "rights": list(scopes),
+                    "who": event["principal"], "issuer": event["actor"],
+                    "rights": list(scopes),
                     "tenant": source["tenant"], "until": event["expires_at"],
                     "version": version,
                 }
@@ -220,7 +230,7 @@ def generate_trace(rng: random.Random, episode_id: int) -> list[dict]:
                   until=t + rng.choice((0, 1, 5)))
     elif case == "revoke":
         add_grant(grant_scope="read", until=t+10)
-        events.append(_event(t+1, "revoke", grant_id=gid if rng.random()<.8 else "missing"))
+        events.append(_event(t+1, "revoke", grant_id=gid if rng.random()<.8 else "missing", actor="security_admin"))
         events.append(_event(t+2, "read", grant_id=gid, principal=principal,
             scope="read", tenant=tenant, resource_id="r1", classification=1, clearance=2))
     elif case == "expiry":
@@ -229,13 +239,13 @@ def generate_trace(rng: random.Random, episode_id: int) -> list[dict]:
             scope="read", tenant=tenant, resource_id="r1", classification=1, clearance=2))
     elif case == "policy_update":
         add_grant(grant_scope="read", until=t+10)
-        events.append(_event(t+1, "policy_update", version=2))
+        events.append(_event(t+1, "policy_update", actor="security_admin", version=2))
         events.append(_event(t+2, "read", grant_id=gid, principal=principal,
             scope="read", tenant=tenant, resource_id="r1", classification=1, clearance=2))
     elif case == "delegate":
         add_grant(grant_scope="read", until=t+10)
         child_scopes = ["read"] if rng.random()<.5 else ["read", "write"]
-        events.append(_event(t+1, "delegate", source_grant_id=gid,
+        events.append(_event(t+1, "delegate", source_grant_id=gid, actor=principal,
             grant_id=f"child-{episode_id}", principal="dave", scopes=child_scopes,
             expires_at=t+rng.choice((2, 8, 12))))
     elif case == "assume_admin":
