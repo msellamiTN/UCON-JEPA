@@ -230,7 +230,8 @@ def generate_trace(rng: random.Random, episode_id: int) -> list[dict]:
                   until=t + rng.choice((0, 1, 5)))
     elif case == "revoke":
         add_grant(grant_scope="read", until=t+10)
-        events.append(_event(t+1, "revoke", grant_id=gid if rng.random()<.8 else "missing", actor="security_admin"))
+        events.append(_event(t+1, "revoke", grant_id=gid if rng.random()<.8 else "missing",
+            actor=rng.choice(("security_admin", "mallory"))))
         events.append(_event(t+2, "read", grant_id=gid, principal=principal,
             scope="read", tenant=tenant, resource_id="r1", classification=1, clearance=2))
     elif case == "expiry":
@@ -239,13 +240,15 @@ def generate_trace(rng: random.Random, episode_id: int) -> list[dict]:
             scope="read", tenant=tenant, resource_id="r1", classification=1, clearance=2))
     elif case == "policy_update":
         add_grant(grant_scope="read", until=t+10)
-        events.append(_event(t+1, "policy_update", actor="security_admin", version=2))
+        events.append(_event(t+1, "policy_update",
+            actor=rng.choice(("security_admin", "mallory")), version=2))
         events.append(_event(t+2, "read", grant_id=gid, principal=principal,
             scope="read", tenant=tenant, resource_id="r1", classification=1, clearance=2))
     elif case == "delegate":
         add_grant(grant_scope="read", until=t+10)
         child_scopes = ["read"] if rng.random()<.5 else ["read", "write"]
-        events.append(_event(t+1, "delegate", source_grant_id=gid, actor=principal,
+        events.append(_event(t+1, "delegate", source_grant_id=gid,
+            actor=rng.choice((principal, "mallory")),
             grant_id=f"child-{episode_id}", principal="dave", scopes=child_scopes,
             expires_at=t+rng.choice((2, 8, 12))))
     elif case == "assume_admin":
