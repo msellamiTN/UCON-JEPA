@@ -77,7 +77,7 @@ def make_episode(seed:int, episode_id:int, scenario:str|None=None)->dict:
         motif_like=False
     elif scenario=="stale_delegation":
         events.extend([_base_grant(t,"target","alice","read",t+20),
-            _event(t+1,"policy_update",version=2),
+            _event(t+1,"policy_update",actor="security_admin",version=2),
             _event(t+2,"delegate",source_grant_id="target",actor="alice",grant_id="child",principal="bob",
                 scopes=["read"],expires_at=t+10)])
         motif_like=False
