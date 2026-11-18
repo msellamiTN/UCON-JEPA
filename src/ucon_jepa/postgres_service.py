@@ -104,7 +104,6 @@ class PostgresUconService:
                 if statement.strip():
                     conn.execute(statement)
 
-    @staticmethod
     def _lock_control(self, cur, expected_writer_epoch=None):
         row = cur.execute(
             "SELECT policy_version, authorization_epoch, writer_epoch "
