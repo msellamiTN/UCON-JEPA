@@ -1,5 +1,6 @@
 import unittest
-from randomized_temporal_traces import campaign, make_episode, SCENARIOS, ENTITLEMENTS
+from randomized_temporal_traces import (campaign, make_episode, SCENARIOS, ENTITLEMENTS,
+    has_motif_like_subsequence)
 from reference_semantics import evaluate
 
 class RandomizedTemporalTraceTests(unittest.TestCase):
@@ -16,6 +17,17 @@ class RandomizedTemporalTraceTests(unittest.TestCase):
         x=make_episode(9,0,"benign_admin")
         self.assertTrue(x["motif_like_subsequence"])
         self.assertFalse(x["unsafe"])
+    def test_motif_flag_is_derived_from_contiguous_event_patterns(self):
+        for scenario in SCENARIOS:
+            episode=make_episode(55,2,scenario)
+            self.assertEqual(
+                episode["motif_like_subsequence"],
+                has_motif_like_subsequence(episode["events"]),
+            )
+        # A revocation between grant and assume_admin breaks the contiguous motif.
+        revoked=make_episode(44,1,"revoked_grant")
+        self.assertFalse(has_motif_like_subsequence(revoked["events"]))
+
     def test_unsafe_trace_without_motif_like_subsequence(self):
         for scenario in ("revoked_grant","expired_grant","stale_policy_read","stale_delegation"):
             x=make_episode(44,1,scenario)
