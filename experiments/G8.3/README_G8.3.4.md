@@ -16,6 +16,10 @@ Add a second executable semantics for the G8.3 temporal policy model and compare
 
 A zero-mismatch result is evidence that two separately coded evaluators agree on the generated trace distribution. It does not establish that the shared written policy specification is complete, coherent, conflict-free, or appropriate for an operational organization. Both implementations can share a conceptual defect. Independent domain review and property-based invariant analysis remain separate gates.
 
+## Dependency and integration
+
+This increment is stacked on PR #9, which hardens the reference evaluator's input schema. The combined PR validation must run against that strict-schema branch before PR #9 is merged and PR #10 is retargeted to `main`.
+
 ## Reproduction
 
 ```bash
