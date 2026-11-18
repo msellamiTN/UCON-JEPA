@@ -23,7 +23,7 @@ class IndependentTemporalOracleTests(unittest.TestCase):
             {"time": 1, "sequence": 0, "type": "grant", "grant_id": "g",
              "actor": "security_admin", "principal": "alice", "scopes": ["read"],
              "tenant": "tenant-a", "expires_at": 10, "policy_version": 1},
-            {"time": 2, "sequence": 0, "type": "revoke", "grant_id": "g"},
+            {"time": 2, "sequence": 0, "type": "revoke", "grant_id": "g", "actor": "security_admin"},
             {"time": 3, "sequence": 0, "type": "read", "grant_id": "g",
              "principal": "alice", "scope": "read", "tenant": "tenant-a",
              "resource_id": "r1", "classification": 1, "clearance": 2},
@@ -31,6 +31,13 @@ class IndependentTemporalOracleTests(unittest.TestCase):
         result = oracle(trace)
         self.assertFalse(result["decisions"][-1]["allowed"])
         self.assertEqual(result["decisions"][-1]["reason"], "read_not_authorized")
+
+    def test_oracle_rejects_unauthorized_policy_update(self):
+        trace = [{"time": 1, "sequence": 0, "type": "policy_update",
+                  "actor": "mallory", "version": 2}]
+        result = oracle(trace)
+        self.assertFalse(result["decisions"][0]["allowed"])
+        self.assertEqual(result["policy_version"], 1)
 
     def test_generator_is_seed_reproducible(self):
         a = generate_trace(random.Random(1234), 9)
