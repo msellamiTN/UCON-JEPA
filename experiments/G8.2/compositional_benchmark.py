@@ -69,7 +69,7 @@ def feat(row):
     fam=row["family"]; prefix=row["prefix"]
     vocab=[a for f in FAMILIES for a in ACTIONS[f]]
     counts=Counter(prefix)
-    return np.asarray([int(fam==f for f in FAMILIES)] + [counts[a] for a in vocab] +
+    return np.asarray([int(fam==f) for f in FAMILIES] + [counts[a] for a in vocab] +
                      [len(prefix)] + [int(prefix[-1]==a) for a in vocab], dtype=float)
 
 def partition(rows,name):
