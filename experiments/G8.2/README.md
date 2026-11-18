@@ -53,6 +53,13 @@ result is scientifically acceptable.
 `reactive_b0.py` implements an authoritative motif-based action gate. It denies only the action that would complete a configured unsafe ordered motif (the in-distribution motif or the held-out motif). It is reactive: it does not predict future violations, and it is not JEPA. This baseline is intended to establish the prevention/false-intervention floor before predictive models are compared.
 
 
+The CI workflow also runs `reactive_b0_benchmark.py` against the compositional test partition and retains `b0_reactive_metrics.json`. The false-intervention rate is explicitly reported as not estimable because the current test partition injects an unsafe motif into every episode; a benign test cohort is required for that metric.
+
+Run the B0 evaluator manually:
+```bash
+python experiments/G8.2/reactive_b0_benchmark.py --seed 2026 --episodes-per-family 100 --out experiments/G8.2/output
+```
+
 Tests cover motif-completion denial, safe-action acceptance, and safe traces with zero interventions. Run the test suite with:
 
 ```bash
