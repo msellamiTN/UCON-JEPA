@@ -1,12 +1,19 @@
 ---------------- MODULE G8_3_12_MultiWriterReplay ----------------
 EXTENDS Naturals, FiniteSets
 
-CONSTANTS Writers, EventIdByWriter, EvaluationIdByWriter
+CONSTANTS Writers, DuplicateMode
 
 ASSUME /\ Writers = {"w1", "w2"}
-       /\ EventIdByWriter \in [Writers -> STRING]
-       /\ EvaluationIdByWriter \in [Writers -> STRING]
-       /\ EvaluationIdByWriter["w1"] # EvaluationIdByWriter["w2"]
+       /\ DuplicateMode \in BOOLEAN
+
+EventIdByWriter ==
+  [w \in Writers |->
+    IF DuplicateMode THEN "event-1"
+    ELSE IF w = "w1" THEN "event-1" ELSE "event-2"]
+
+EvaluationIdByWriter ==
+  [w \in Writers |->
+    IF w = "w1" THEN "evaluation-1" ELSE "evaluation-2"]
 
 EventIds == {EventIdByWriter[w] : w \in Writers}
 EvaluationIds == {EvaluationIdByWriter[w] : w \in Writers}
