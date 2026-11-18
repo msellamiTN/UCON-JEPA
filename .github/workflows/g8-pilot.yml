@@ -34,6 +34,8 @@ jobs:
         run: python -m unittest discover -s experiments/G8.3 -p "test_*.py" -v
       - name: G8.3.2 randomized temporal trace campaign
         run: python experiments/G8.3/randomized_temporal_traces.py --seed 8302 --episodes 1200 --out artifacts/g8.3.2
+      - name: G8.3.4 independent temporal state-machine differential audit
+        run: python experiments/G8.3/independent_temporal_oracle.py --seed 8304 --episodes 5000 --out artifacts/g8.2-pilot/g8.3.4
       - name: Upload pilot outputs
         uses: actions/upload-artifact@v4
         with:
