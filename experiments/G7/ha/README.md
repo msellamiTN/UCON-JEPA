@@ -1,6 +1,6 @@
 # G7.8 PostgreSQL HA lab (Patroni + etcd)
 
-**Status: topology scaffold committed; not yet executed or validated.**
+**Status: Compose model and Patroni image build passed CI; the multi-node runtime smoke test is now automated and awaiting its first execution.**
 
 This lab is intentionally separate from the single-primary PostgreSQL CI service. It provisions three PostgreSQL/Patroni nodes, a three-member etcd quorum, and HAProxy routing to the Patroni primary.
 
@@ -123,7 +123,7 @@ docker compose -f compose.yaml down -v
 ## Limitations
 
 - This Compose topology places all nodes on one Docker host and one bridge network; it does not model independent availability zones or host failures.
-- The scaffold has not yet been started, health-checked, partition-tested, or subjected to a promotion campaign.
+- The first CI validation confirmed Compose syntax and image build. Runtime cluster startup, quorum, streaming replication, and HAProxy read/write smoke checks are now automated; their results must be reviewed before claiming those properties.\n- The lab has not been partition-tested or subjected to a controlled promotion campaign.
 - Patroni/etcd election is not by itself proof of safe storage fencing under arbitrary partitions.
 - Do not treat the writer_epoch field as an external fencing mechanism. The former primary must be demonstrably unable to accept protected writes.
 - No G7.8 RPO, RTO, split-brain, or HA result is claimed until raw trial evidence is committed.
