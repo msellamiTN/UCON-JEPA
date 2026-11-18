@@ -25,7 +25,7 @@ jobs:
         run: python experiments/G8.2/reactive_b0_benchmark.py --seed 2026 --episodes-per-family 100 --out artifacts/g8.2-pilot
       - name: Mixed benign/unsafe B0 benchmark
         run: python experiments/G8.2/mixed_b0_benchmark.py --seed 2026 --episodes-per-family 100 --replicates 30 --out artifacts/g8.2-pilot
-      - name: Upload pilot outputs
+      - name: Contextual stateful policy benchmark\n        run: python experiments/G8.2/contextual_benchmark.py --out artifacts/g8.2-pilot\n      - name: Upload pilot outputs
         uses: actions/upload-artifact@v4
         with:
           name: g8.2-pilot-results
