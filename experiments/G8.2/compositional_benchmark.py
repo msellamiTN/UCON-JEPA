@@ -61,7 +61,7 @@ def build(seed, episodes_per_family):
             for t in range(SEQUENCE_LEN-HORIZON):
                 fut=trace[t+1:t+1+HORIZON]
                 rows.append({"family":family,"episode_id":f"{family}-{ix:05d}","partition":part,
-                         "split_motif":part,"seed":epseed,"t":t,"prefix":trace[:t+1],
+                         "split_motif":part,"seed":epseed,"t":t,"trace":trace,"prefix":trace[:t+1],
                          "target":motif_label(family,fut)})
     return rows
 
