@@ -37,7 +37,7 @@ jobs:
         run: cp .env.example .env
       - name: Start three-node Patroni cluster
         working-directory: experiments/G7/ha
-        run: docker compose -f compose.yaml up -d --build
+        run: docker compose -f compose.yaml up -d
       - name: Wait for quorum, leader, replicas, and HAProxy read/write
         working-directory: experiments/G7/ha
         env:
