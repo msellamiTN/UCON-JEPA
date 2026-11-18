@@ -32,7 +32,8 @@ class PostgresOutbox:
     def initialize(self) -> None:
         self.service.initialize()
 
-    def claim(self, *, limit: int = 20, lease_seconds: int = 30) -> list[OutboxEvent]:
+    def claim(self, *, limit: int = 20, lease_seconds: int = 30,
+              event_id: str | None = None) -> list[OutboxEvent]:
         if limit < 1 or lease_seconds < 0:
             raise ValueError("limit must be positive and lease_seconds non-negative")
         with self.service._connect() as conn:
@@ -42,6 +43,7 @@ class PostgresOutbox:
                     WITH candidates AS (
                         SELECT event_id FROM ucon_outbox
                         WHERE delivered_at IS NULL
+                          AND (%s IS NULL OR event_id=%s)
                           AND available_at <= clock_timestamp()
                           AND (lease_until IS NULL OR lease_until <= clock_timestamp())
                         ORDER BY created_at, event_id
@@ -55,7 +57,7 @@ class PostgresOutbox:
                     WHERE o.event_id = c.event_id
                     RETURNING o.event_id, o.event_type, o.payload, o.attempts
                     """,
-                    (limit, lease_seconds),
+                    (event_id, event_id, limit, lease_seconds),
                 ).fetchall()
                 return [
                     OutboxEvent(
@@ -91,9 +93,10 @@ class PostgresOutbox:
             return row is not None
 
     def deliver_once(self, send: Callable[[OutboxEvent], Any], *,
-                     limit: int = 20, lease_seconds: int = 30) -> tuple[int, int]:
+                     limit: int = 20, lease_seconds: int = 30,
+                     event_id: str | None = None) -> tuple[int, int]:
         """Send claimed events, then acknowledge; failed sends remain leased."""
-        events = self.claim(limit=limit, lease_seconds=lease_seconds)
+        events = self.claim(limit=limit, lease_seconds=lease_seconds, event_id=event_id)
         sent = failed = 0
         for event in events:
             try:
