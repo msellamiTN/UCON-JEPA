@@ -6,7 +6,11 @@ dc=(docker compose -f compose.yaml)
 
 cleanup() {
   "${dc[@]}" logs --no-color > ha-smoke-compose.log 2>&1 || true
-  "${dc[@]}" down -v --remove-orphans || true
+  if [ "${KEEP_CLUSTER:-0}" != "1" ]; then
+    "${dc[@]}" down -v --remove-orphans || true
+  else
+    echo "KEEP_CLUSTER=1: preserving healthy cluster for subsequent experiment"
+  fi
 }
 trap cleanup EXIT
 
