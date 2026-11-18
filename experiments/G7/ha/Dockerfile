@@ -9,5 +9,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/opt/patroni-venv/bin:$PATH"
+USER postgres
 ENTRYPOINT ["patroni"]
 CMD ["/etc/patroni.yml"]
