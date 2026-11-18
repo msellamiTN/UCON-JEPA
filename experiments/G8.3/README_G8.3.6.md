@@ -1,30 +1,33 @@
-# G8.3.6 — Signed event provenance
+# G8.3.6 — Authenticated signed event provenance
 
 ## Objective
-Replace self-asserted event identity with a verifiable principal binding. The verifier accepts an event only when its Ed25519 signature validates against an out-of-band trusted-key registry, the key is active, and the event actor (when present) agrees with the registry principal.
+Ensure privileged event identity is authenticated by a cryptographic key rather than trusted from a self-asserted `actor` field.
 
-## Envelope
-An envelope contains exactly `key_id`, `nonce`, `event`, and base64 `signature`. The signature covers the canonical serialization of `{key_id, nonce, event}`; changing the event, key identifier, or nonce invalidates it.
+## Implemented envelope
+The existing `event_provenance.py` module signs a domain-separated canonical JSON message containing:
+- domain and schema version
+- issuer and key identifier
+- unique event identifier
+- complete event body
 
-## Canonicalization profile
-This prototype uses UTF-8 JSON with sorted object keys, compact separators, non-string object keys rejected, and floating-point values forbidden. It is a constrained deterministic JSON profile, **not** a full RFC 8785 implementation. Interoperable production deployments must adopt a formally specified canonical format and publish test vectors.
+Ed25519 signatures are verified against an out-of-band trusted-key registry. The registry binds key IDs to issuers and defines validity intervals and revocation time.
 
-## Security properties tested
-- Ed25519 signature verification and tamper detection
-- Binding between signing key, trusted principal and event actor
-- Unknown/revoked key rejection
-- Per-key nonce replay rejection
-- Signature binding to key ID and nonce
+## Security checks
+- signature integrity and domain separation
+- authenticated issuer-to-key binding
+- privileged actor-to-issuer binding
+- key validity interval and revocation
+- event-ID replay detection, including across calls when the caller supplies the returned replay set
+- strict envelope fields and base64 validation
 
-## Explicit limitations
-- The replay cache is process-local. Production must use durable, atomic replay protection shared across verifier replicas.
-- The key registry is an injected trusted input; secure provisioning, rotation, revocation distribution and audit are not implemented.
-- Private-key custody must be delegated to KMS/HSM; the helper in this module is for tests/producers only.
-- This layer authenticates event origin; it does not prove authorization-policy correctness or replace the G8.3 evaluator.
-- No trusted timestamp/freshness window is enforced yet; logical event time is not wall-clock time.
+## Important limits
+- The caller must persist the replay-ID set transactionally in a durable shared ledger; in-memory state alone is insufficient for distributed deployment.
+- Trusted-key provisioning, rotation workflows, secure registry distribution, KMS/HSM custody and trusted timestamping are external responsibilities.
+- Canonicalization uses deterministic Python JSON serialization; cross-language interoperability still needs a formally specified canonicalization profile and published test vectors.
+- Provenance verification authenticates origin. The policy evaluator must still enforce authorization; cryptographic authenticity does not imply permission or prove policy correctness.
 
 ## Reproduction
 ```bash
 python -m pip install cryptography
-python -m unittest discover -s experiments/G8.3 -p 'test_signed_event_provenance.py' -v
+python -m unittest discover -s experiments/G8.3 -p 'test_event_provenance.py' -v
 ```
