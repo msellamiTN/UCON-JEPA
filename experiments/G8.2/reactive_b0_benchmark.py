@@ -31,12 +31,14 @@ def evaluate(seed=2026, episodes_per_family=100):
     for family,m in per_family.items():
         report[family]={**m,
           "episode_prevention_recall":m["intercepted_episodes"]/m["unsafe_episodes"] if m["unsafe_episodes"] else 0.0,
-          "false_intervention_rate":None,\n          "false_intervention_estimable":False,
+          "false_intervention_rate":None,
+          "false_intervention_estimable":False,
           "mean_blocked_actions_per_episode":m["blocked_actions"]/m["episodes"] if m["episodes"] else 0.0,
           "lead_time_actions":0,
           "interpretation":"Reactive rule baseline: blocks at unsafe motif completion; no predictive lead time."}
     return {"benchmark":"G8.2 B0 reactive gate","seed":seed,"episodes_per_family":episodes_per_family,
-            "partition":"held-out compositional test","results_by_family":report,\n            "false_intervention_note":"Not estimable: every test episode has an injected unsafe motif; benign test episodes are needed.",
+            "partition":"held-out compositional test","results_by_family":report,
+            "false_intervention_note":"Not estimable: every test episode has an injected unsafe motif; benign test episodes are needed.",
             "limitation":"Synthetic motif-level prevention only; no environment side effects, predictive detection, or production security claim."}
 
 def main():
@@ -47,6 +49,7 @@ def main():
     a=p.parse_args()
     result=evaluate(a.seed,a.episodes_per_family)
     a.out.mkdir(parents=True,exist_ok=True)
-    (a.out/"b0_reactive_metrics.json").write_text(json.dumps(result,indent=2)+"\n")
+    (a.out/"b0_reactive_metrics.json").write_text(json.dumps(result,indent=2)+"
+")
     print(json.dumps(result,indent=2))
 if __name__=="__main__": main()
