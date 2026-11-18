@@ -47,9 +47,8 @@ jobs:
           PATRONI_SUPERUSER_PASSWORD: local-only-change-me
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
-        run: bash smoke_test.sh
-        env:
           KEEP_CLUSTER: "1"
+        run: bash smoke_test.sh
       - name: Guarded primary process crash experiment
         working-directory: experiments/G7/ha
         if: success()
