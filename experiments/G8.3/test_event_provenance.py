@@ -4,7 +4,7 @@ import unittest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from event_provenance import ProvenanceError, sign_event, verify_signed_trace
+from event_provenance import ProvenanceError, _signed_message, sign_event, verify_signed_trace
 
 
 class SignedEventProvenanceTests(unittest.TestCase):
@@ -73,11 +73,13 @@ class SignedEventProvenanceTests(unittest.TestCase):
         envelope["event"]["actor"] = "mallory"
         # Re-sign the altered event as the authenticated principal to test the
         # actor-binding guard independently of signature-integrity validation.
-        envelope = sign_event(
-            envelope["event"], issuer="security_admin",
-            key_id="security-admin-k1", event_id="evt-2",
-            private_key=self.private,
-        )
+        altered = envelope["event"]
+        issuer, key_id, event_id = "security_admin", "security-admin-k1", "evt-2"
+        signature = self.private.sign(_signed_message(issuer, key_id, event_id, altered))
+        envelope = {
+            "issuer": issuer, "key_id": key_id, "event_id": event_id,
+            "event": altered, "signature": base64.b64encode(signature).decode("ascii"),
+        }
         with self.assertRaisesRegex(ProvenanceError, "actor does not match"):
             verify_signed_trace([envelope], self.registry)
 
