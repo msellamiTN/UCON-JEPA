@@ -20,6 +20,10 @@ A zero-mismatch result is evidence that two separately coded evaluators agree on
 
 This increment now targets `main` after PR #11 integrated strict event-schema validation and actor-bound privileged transitions. The randomized differential campaign is therefore evaluated against the merged temporal semantics, including the required actor checks.
 
+## Validation gate
+
+The merged-main validation must rerun both the 5,000-episode differential campaign and the repository validation suite at the current PR head. Historical passing runs on an earlier base are supporting evidence only, not a substitute for this integration check.
+
 ## Reproduction
 
 ```bash
