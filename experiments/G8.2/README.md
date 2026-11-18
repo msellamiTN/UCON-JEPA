@@ -12,7 +12,7 @@ This is a **pipeline smoke pilot**, not the full G8.2 benchmark.
 
 ## Important limits
 - Synthetic labels are simplified and imperfect proxies.
-- Split is episode-level, **not yet a compositional held-out action-combination split**.
+- Split is episode-level, **not yet a compositional held-out action-combination split**. Threshold is tuned on the validation partition only.
 - No formal/reactive baseline, JEPA, probabilistic baseline, calibration, multi-seed CI, or intervention simulation yet.
 - This smoke pilot cannot establish predictive security benefit.
 
