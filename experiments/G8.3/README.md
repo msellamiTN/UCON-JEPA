@@ -11,6 +11,8 @@ This increment creates deterministic, seeded, variable-length synthetic traces o
 
 Each episode stores its seed, full event sequence, decisions, first violation, replayable failing prefix, and SHA-256 trace digest. The campaign also records scenario counts and aggregate benign/unsafe counts.
 
+The `motif_like_subsequence` field is computed from the event sequence, not assigned from the scenario name. It detects these contiguous event-type patterns: `grant → assume_admin`, `workflow_request → approve → export`, and `workflow_request → approve → pay`. This is a structural descriptor only; it does not classify a trace as safe or unsafe.
+
 ## Reproduction
 
 ```bash
