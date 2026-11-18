@@ -65,6 +65,7 @@ services:
       retries: 20
 
   pg1:
+    image: ucon-jepa-patroni:local
     build: .
     hostname: pg1
     environment:
@@ -83,7 +84,7 @@ services:
     networks: [ha]
 
   pg2:
-    build: .
+    image: ucon-jepa-patroni:local
     hostname: pg2
     environment:
       PATRONI_NAME: pg2
@@ -101,7 +102,7 @@ services:
     networks: [ha]
 
   pg3:
-    build: .
+    image: ucon-jepa-patroni:local
     hostname: pg3
     environment:
       PATRONI_NAME: pg3
