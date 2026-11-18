@@ -27,7 +27,7 @@ class TemporalPolicyTests(unittest.TestCase):
         e=self.grant(scopes=["admin"]); e["grantable_scopes"]=["admin"]
         self.assertFalse(evaluate([e],{"security_admin":["read"]})["decisions"][-1]["allowed"])
     def test_grant_rejects_unknown_scope_without_trusted_entitlement(self):
-        self.assertFalse(evaluate([self.grant(scopes=["admin"])],ENT)["decisions"][-1]["allowed"])
+        self.assertFalse(evaluate([self.grant(scopes=["admin"])],{"security_admin":["read"]})["decisions"][-1]["allowed"])
     def test_assume_admin_requires_active_grant(self):
         events=[self.grant(scopes=["admin"]),ev(2,"assume_admin",grant_id="g1",principal="alice",scope="admin",tenant="t1")]
         self.assertTrue(evaluate(events,ENT)["decisions"][-1]["allowed"])
