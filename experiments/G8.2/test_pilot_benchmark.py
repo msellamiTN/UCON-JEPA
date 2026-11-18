@@ -5,10 +5,13 @@ class PilotTests(unittest.TestCase):
     def test_deterministic_episode(self):
         self.assertEqual(episode(123, "iam"), episode(123, "iam"))
 
-    def test_labels(self):
+    def test_ordered_motif_labels(self):
         self.assertTrue(violation("iam", ["grant_role", "assume_admin"]))
+        self.assertFalse(violation("iam", ["assume_admin", "grant_role"]))
         self.assertTrue(violation("data", ["read_sensitive", "export_sensitive"]))
+        self.assertFalse(violation("data", ["export_sensitive", "read_sensitive"]))
         self.assertTrue(violation("sod", ["request", "approve", "pay"]))
+        self.assertFalse(violation("sod", ["request", "pay", "approve"]))
         self.assertFalse(violation("sod", ["request", "pay"]))
 
     def test_episode_split_no_leakage(self):
