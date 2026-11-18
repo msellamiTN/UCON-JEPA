@@ -1,20 +1,34 @@
 {
-  "specification":"G8.3.1 temporal policy model",
-  "version":"1.1.0",
-  "status":"research_reference_model_not_production_policy",
-  "time_model":"integer logical time; strictly increasing lexicographic (time, sequence)",
-  "trusted_state":{"actor_entitlements":"Supplied out-of-band to evaluator; never accepted from an event payload."},
-  "event_types":["policy_update","grant","revoke","delegate","assume_admin","read","workflow_request","workflow_amend","approve","export","pay"],
-  "rules":{
-    "grant":"Only security_admin may grant scopes in trusted_entitlements[actor]; expiry is exclusive and policy version must be current.",
-    "delegate":"Source grant must be unrevoked, unexpired and current-version; delegated scopes are a nonempty subset; expiry is within source expiry.",
-    "assume_admin":"Requires an active current-version grant for the specified principal, scope and tenant.",
-    "read":"Requires active grant, matching tenant, and clearance >= classification.",
-    "approve":"Approval binds workflow_id, revision, policy_version, action, principal, resource_id and recipient; requester and approver differ.",
-    "export":"Requires a prior authorized read and exact match to a current workflow approval for principal, resource, recipient, revision and policy version; recipient must be owner.",
-    "pay":"Requires a current pay approval and pairwise-distinct requester, approver and payer."
+  "specification": "G8.3.1 temporal policy model",
+  "version": "1.1.0",
+  "status": "research_reference_model_not_production_policy",
+  "time_model": "integer logical time; strictly increasing lexicographic (time, sequence)",
+  "trusted_state": {
+    "actor_entitlements": "Supplied out-of-band to evaluator; never accepted from an event payload."
   },
-  "global_invariants":[
+  "event_types": [
+    "policy_update",
+    "grant",
+    "revoke",
+    "delegate",
+    "assume_admin",
+    "read",
+    "workflow_request",
+    "workflow_amend",
+    "approve",
+    "export",
+    "pay"
+  ],
+  "rules": {
+    "grant": "Only security_admin may grant scopes in trusted_entitlements[actor]; expiry is exclusive and policy version must be current.",
+    "delegate": "Source grant must be unrevoked, unexpired and current-version; delegated scopes are a nonempty subset; expiry is within source expiry.",
+    "assume_admin": "Requires an active current-version grant for the specified principal, scope and tenant.",
+    "read": "Requires active grant, matching tenant, and clearance >= classification.",
+    "approve": "Approval binds workflow_id, revision, policy_version, action, principal, resource_id and recipient; requester and approver differ.",
+    "export": "Requires a prior authorized read and exact match to a current workflow approval for principal, resource, recipient, revision and policy version; recipient must be owner.",
+    "pay": "Requires a current pay approval and pairwise-distinct requester, approver and payer."
+  },
+  "global_invariants": [
     "Revoked grants never authorize subsequent actions.",
     "A grant is valid iff event_time < expires_at.",
     "All authorization decisions use the current policy version.",
@@ -22,5 +36,40 @@
     "Approval is bound to one workflow revision and action subject.",
     "Requester, approver and payer are pairwise distinct for payment."
   ],
-  "event_contract":{"required":["time","sequence","type"],"unknown_events":"rejected","malformed_events":"rejected"}
+  "event_contract": {
+    "required": [
+      "time",
+      "sequence",
+      "type"
+    ],
+    "unknown_events": "rejected",
+    "malformed_events": "rejected",
+    "field_types": {
+      "time": "nonnegative integer (bool rejected)",
+      "sequence": "nonnegative integer (bool rejected)",
+      "type": "non-empty string in event_types",
+      "version": "positive integer for policy_update",
+      "grant_id": "non-empty string",
+      "source_grant_id": "non-empty string",
+      "actor": "non-empty string",
+      "principal": "non-empty string",
+      "scopes": "non-empty list of non-empty strings",
+      "tenant": "non-empty string",
+      "expires_at": "positive integer",
+      "policy_version": "positive integer",
+      "scope": "non-empty string",
+      "resource_id": "non-empty string",
+      "classification": "nonnegative integer",
+      "clearance": "nonnegative integer",
+      "workflow_id": "non-empty string",
+      "requester": "non-empty string",
+      "revision": "positive integer",
+      "approver": "non-empty string",
+      "action": "non-empty string",
+      "recipient": "non-empty string",
+      "workflow_revision": "positive integer",
+      "payer": "non-empty string"
+    },
+    "trusted_entitlements": "Optional mapping from non-empty actor strings to lists of non-empty scope strings; supplied out-of-band."
+  }
 }
