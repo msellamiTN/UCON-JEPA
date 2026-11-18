@@ -217,7 +217,7 @@ def generate_trace(rng: random.Random, episode_id: int) -> list[dict]:
     if case == "grant":
         add_grant(actor=rng.choice(("security_admin", "analyst")),
                   grant_scope=rng.choice(("read", "admin", "unknown")),
-                  until=t + rng.choice((-1, 1, 5)))
+                  until=t + rng.choice((0, 1, 5)))
     elif case == "revoke":
         add_grant(grant_scope="read", until=t+10)
         events.append(_event(t+1, "revoke", grant_id=gid if rng.random()<.8 else "missing"))
