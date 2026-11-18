@@ -43,6 +43,7 @@ jobs:
             texlive-latex-base \
             texlive-latex-recommended \
             texlive-pictures \
+            texlive-latex-extra \
             lmodern
       - name: Build and verify all LaTeX dossiers
         working-directory: paper/formal
