@@ -18,7 +18,7 @@ A zero-mismatch result is evidence that two separately coded evaluators agree on
 
 ## Dependency and integration
 
-This increment is stacked on PR #9, which hardens the reference evaluator's input schema. The combined PR validation must run against that strict-schema branch before PR #9 is merged and PR #10 is retargeted to `main`.
+This increment now targets `main` after PR #11 integrated strict event-schema validation and actor-bound privileged transitions. The randomized differential campaign is therefore evaluated against the merged temporal semantics, including the required actor checks.
 
 ## Reproduction
 
