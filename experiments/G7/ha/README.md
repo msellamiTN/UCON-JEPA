@@ -87,6 +87,18 @@ docker compose -f compose.yaml exec pg2 patronictl -c /etc/patroni.yml list
 
 A container stop is a process/node failure experiment; it is **not** a network partition experiment.
 
+## Guarded primary-process crash experiment
+
+After the cluster smoke test passes, run the process-crash harness in a disposable cluster:
+
+```bash
+PATRONI_SUPERUSER_PASSWORD='your-local-lab-password' bash primary_crash_experiment.sh
+```
+
+The harness refuses to inject a fault unless exactly one Patroni primary is observed. It writes a unique probe record through HAProxy, stops the current primary container, waits for a different unique primary, measures observed promotion RTO, and verifies that the acknowledged probe is visible through the new HAProxy route. It writes `ha-primary-crash-results.env` for evidence capture.
+
+This is a process/container crash test on one Docker host. It is not a network partition, independent host failure, split-brain proof, or a comprehensive RPO guarantee. Run only in the disposable lab after a healthy smoke test; archive logs and result files before teardown.
+
 ## Network partition campaign
 
 The Compose bridge network is named `ucon-jepa-ha_ha` by default. Use a dedicated fault-injection harness to isolate a node from the DCS and client path while preserving its PostgreSQL process and storage. Record the exact network rules and timestamps. Never claim split-brain exclusion from a simple `docker stop` test.
@@ -123,7 +135,7 @@ docker compose -f compose.yaml down -v
 ## Limitations
 
 - This Compose topology places all nodes on one Docker host and one bridge network; it does not model independent availability zones or host failures.
-- The first CI validation confirmed Compose syntax and image build. The first runtime attempt started the containers but failed to establish streaming replication: PostgreSQL reported no matching `pg_hba.conf` entry for the replication user. Patroni also could not rename the data directory because it was mounted at the mount-point root. The configuration now adds explicit replication/client HBA rules and moves `data_dir` into a child directory of the mounted volume. The corrected runtime rerun is pending.\n- The lab has not been partition-tested or subjected to a controlled promotion campaign.
+- The first CI validation confirmed Compose syntax and image build. The first runtime attempt started the containers but failed to establish streaming replication: PostgreSQL reported no matching `pg_hba.conf` entry for the replication user. Patroni also could not rename the data directory because it was mounted at the mount-point root. The configuration now adds explicit replication/client HBA rules and moves `data_dir` into a child directory of the mounted volume. The corrected runtime rerun is pending. A guarded primary-process crash harness has also been added, but it must only be run after the smoke test passes.\n- The lab has not been partition-tested or subjected to a controlled promotion campaign.
 - Patroni/etcd election is not by itself proof of safe storage fencing under arbitrary partitions.
 - Do not treat the writer_epoch field as an external fencing mechanism. The former primary must be demonstrably unable to accept protected writes.
 - No G7.8 RPO, RTO, split-brain, or HA result is claimed until raw trial evidence is committed.
