@@ -83,10 +83,15 @@ def evaluate(events: list[dict], trusted_entitlements: dict[str, list[str]]|None
         if typ not in EVENT_TYPES: raise TraceError(f"unknown event type: {typ}")
         d={"time":t,"sequence":e["sequence"],"event":typ,"allowed":True,"reason":None}
         if typ=="policy_update":
-            _require(e,"version")
+            _require(e,"actor","version")
+            _require_strings(e,"actor")
             _require_integers(e,"version",minimum=1)
-            if e["version"]<=s.policy_version: raise TraceError("policy version must increase")
-            s.policy_version=e["version"]
+            if e["actor"]!="security_admin" or "admin" not in entitlements.get(e["actor"],[]):
+                d.update(allowed=False,reason="policy_update_requires_admin_entitlement")
+            elif e["version"]<=s.policy_version:
+                raise TraceError("policy version must increase")
+            else:
+                s.policy_version=e["version"]
         elif typ=="grant":
             _require(e,"grant_id","actor","principal","scopes","tenant","expires_at","policy_version")
             _require_strings(e,"grant_id","actor","principal","tenant")
@@ -98,28 +103,37 @@ def evaluate(events: list[dict], trusted_entitlements: dict[str, list[str]]|None
               and type(e["expires_at"]) is int and e["expires_at"]>t
               and e["policy_version"]==s.policy_version and e["grant_id"] not in s.grants)
             if allowed:
-                s.grants[e["grant_id"]]={"principal":e["principal"],"scopes":list(scopes),"tenant":e["tenant"],
+                s.grants[e["grant_id"]]={"principal":e["principal"],"issuer":e["actor"],
+                  "scopes":list(scopes),"tenant":e["tenant"],
                   "expires_at":e["expires_at"],"policy_version":s.policy_version}
             else: d.update(allowed=False,reason="grant_not_authorized_or_invalid")
         elif typ=="revoke":
-            _require(e,"grant_id")
-            _require_strings(e,"grant_id")
-            if e["grant_id"] not in s.grants: d.update(allowed=False,reason="unknown_grant")
-            else: s.revoked.add(e["grant_id"])
+            _require(e,"grant_id","actor")
+            _require_strings(e,"grant_id","actor")
+            grant=s.grants.get(e["grant_id"])
+            if grant is None:
+                d.update(allowed=False,reason="unknown_grant")
+            elif (e["actor"]==grant["issuer"] or
+                  (e["actor"]=="security_admin" and "admin" in entitlements.get(e["actor"],[]))):
+                s.revoked.add(e["grant_id"])
+            else:
+                d.update(allowed=False,reason="revoke_requires_grant_issuer_or_admin")
         elif typ=="delegate":
-            _require(e,"source_grant_id","grant_id","principal","scopes","expires_at")
-            _require_strings(e,"source_grant_id","grant_id","principal")
+            _require(e,"source_grant_id","grant_id","actor","principal","scopes","expires_at")
+            _require_strings(e,"source_grant_id","grant_id","actor","principal")
             _require_string_list(e,"scopes")
             _require_integers(e,"expires_at",minimum=1)
             src=s.grants.get(e["source_grant_id"])
             allowed=bool(src and e["source_grant_id"] not in s.revoked
+              and e["actor"]==src["principal"]
               and t<src["expires_at"] and src["policy_version"]==s.policy_version
               and set(e["scopes"]).issubset(set(src["scopes"]))
               and type(e["expires_at"]) is int and t<e["expires_at"]<=src["expires_at"]
               and e["grant_id"] not in s.grants)
             if allowed:
-                s.grants[e["grant_id"]]={"principal":e["principal"],"scopes":list(e["scopes"]),
-                  "tenant":src["tenant"],"expires_at":e["expires_at"],"policy_version":s.policy_version}
+                s.grants[e["grant_id"]]={"principal":e["principal"],"issuer":e["actor"],
+                  "scopes":list(e["scopes"]),"tenant":src["tenant"],
+                  "expires_at":e["expires_at"],"policy_version":s.policy_version}
             else: d.update(allowed=False,reason="delegation_exceeds_or_lacks_current_authority")
         elif typ=="assume_admin":
             _require(e,"grant_id","principal","scope","tenant")
