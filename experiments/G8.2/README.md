@@ -46,3 +46,15 @@ Held-out motif combinations:
 This remains a controlled synthetic compositional probe: it does not model real
 policy semantics, JEPA, causality, or a security guarantee. A negative or weak
 result is scientifically acceptable.
+
+
+## Reactive formal baseline B0
+
+`reactive_b0.py` implements an authoritative motif-based action gate. It denies only the action that would complete a configured unsafe ordered motif (the in-distribution motif or the held-out motif). It is reactive: it does not predict future violations, and it is not JEPA. This baseline is intended to establish the prevention/false-intervention floor before predictive models are compared.
+
+
+Tests cover motif-completion denial, safe-action acceptance, and safe traces with zero interventions. Run the test suite with:
+
+```bash
+python -m unittest discover -s experiments/G8.2 -p "test_*.py" -v
+```
