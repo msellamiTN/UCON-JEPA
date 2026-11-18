@@ -1,6 +1,8 @@
 import base64
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -60,6 +62,24 @@ class TransactionalReplayLedgerTests(unittest.TestCase):
                 "resource_id": "r1", "classification": 1, "clearance": 2}
         result = self.processor.process([self.signed(read, "denied-e1")], self.keys)
         self.assertFalse(result["evaluation"]["decisions"][0]["allowed"])
+        self.assertEqual(self.processor.counts(), {"processed_events": 1, "evaluations": 1})
+
+    def test_concurrent_duplicate_delivery_commits_exactly_once(self):
+        event = {"time": 1, "sequence": 0, "type": "workflow_request",
+                 "workflow_id": "concurrent-w1", "requester": "alice", "revision": 1}
+        envelope = self.signed(event, "concurrent-e1")
+        barrier = Barrier(2)
+
+        def submit():
+            barrier.wait()
+            try:
+                return self.processor.process([envelope], self.keys)["committed"]
+            except ProvenanceError:
+                return False
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = list(pool.map(lambda _: submit(), range(2)))
+        self.assertEqual(sorted(outcomes), [False, True])
         self.assertEqual(self.processor.counts(), {"processed_events": 1, "evaluations": 1})
 
     def test_multi_event_trace_is_atomic_on_late_schema_failure(self):
