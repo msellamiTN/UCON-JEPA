@@ -197,7 +197,7 @@ class PostgresUconService:
                 )
                 state = cur.execute(
                     "UPDATE ucon_control_state SET authorization_epoch=authorization_epoch+1 "
-                    "WHERE singleton=1 RETURNING policy_version,authorization_epoch"
+                    "WHERE singleton=1 RETURNING policy_version,authorization_epoch,writer_epoch"
                 ).fetchone()
                 seq = cur.execute(
                     "INSERT INTO ucon_events(event_type,outcome,policy_version,"
