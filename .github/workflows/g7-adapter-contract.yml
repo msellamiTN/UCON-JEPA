@@ -63,3 +63,9 @@ jobs:
           PYTHONPATH: src
           UCON_JEPA_TEST_POSTGRES_DSN: "postgresql://ucon:ucon_test_password@localhost:5432/ucon_test"
         run: python -m unittest discover -s tests/G7 -p "test_postgres_outbox.py" -v
+
+      - name: Run G7 PostgreSQL failover-fencing integration tests
+        env:
+          PYTHONPATH: src
+          UCON_JEPA_TEST_POSTGRES_DSN: "postgresql://ucon:ucon_test_password@localhost:5432/ucon_test"
+        run: python -m unittest discover -s tests/G7 -p "test_postgres_failover.py" -v
