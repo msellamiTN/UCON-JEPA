@@ -1,6 +1,6 @@
 # G7.8 PostgreSQL HA lab (Patroni + etcd)
 
-**Status: Compose model and Patroni image build passed CI. Runtime smoke tests have not passed. Run #13 exposed a Patroni YAML parse failure: unquoted `%(ENV_VAR)s` interpolation tokens are invalid YAML scalars. The current correction quotes every interpolation token, installs explicit bootstrap HBA rules, and places `data_dir` below the mounted volume root. The corrected commit still requires a fresh runtime smoke run. No runtime HA acceptance is claimed.**
+**Status: Baseline runtime smoke passed on commit `87589f1` (workflow run #30). Compose validation, image build, cluster startup, quorum/leader readiness, two streaming replicas, and HAProxy write/read were verified. A gated primary-process crash experiment is now added to the workflow and will execute only after the smoke step succeeds. Failover evidence is pending.**
 
 This lab is intentionally separate from the single-primary PostgreSQL CI service. It provisions three PostgreSQL/Patroni nodes, a three-member etcd quorum, and HAProxy routing to the Patroni primary.
 
@@ -89,7 +89,7 @@ A container stop is a process/node failure experiment; it is **not** a network p
 
 ## Guarded primary-process crash experiment
 
-After the cluster smoke test passes, run the process-crash harness in a disposable cluster:
+After the baseline smoke test passes, the CI workflow now preserves that cluster and automatically runs the guarded process-crash harness. For manual use, run it in a disposable cluster:
 
 ```bash
 PATRONI_SUPERUSER_PASSWORD='your-local-lab-password' bash primary_crash_experiment.sh
@@ -135,7 +135,7 @@ docker compose -f compose.yaml down -v
 ## Limitations
 
 - This Compose topology places all nodes on one Docker host and one bridge network; it does not model independent availability zones or host failures.
-- The first CI validation confirmed Compose syntax and image build. The first runtime attempt started the containers but failed to establish streaming replication: PostgreSQL reported no matching `pg_hba.conf` entry for the replication user. Patroni also could not rename the data directory because it was mounted at the mount-point root. The configuration now adds explicit replication/client HBA rules and moves `data_dir` into a child directory of the mounted volume. The corrected runtime rerun is pending. A guarded primary-process crash harness has also been added, but it must only be run after the smoke test passes.\n- The lab has not been partition-tested or subjected to a controlled promotion campaign.
+- Run #30 on commit `87589f1` passed the baseline smoke gate. The credential mismatch from run #28 was corrected. The workflow now gates a primary-process crash experiment on baseline smoke success; the failover experiment has not yet run on the new workflow revision.\n- The lab has not been partition-tested or subjected to a controlled promotion campaign.
 - Patroni/etcd election is not by itself proof of safe storage fencing under arbitrary partitions.
 - Do not treat the writer_epoch field as an external fencing mechanism. The former primary must be demonstrably unable to accept protected writes.
 - No G7.8 RPO, RTO, split-brain, or HA result is claimed until raw trial evidence is committed.
