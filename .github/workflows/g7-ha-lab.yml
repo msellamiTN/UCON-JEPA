@@ -26,3 +26,42 @@ jobs:
       - name: Build Patroni PostgreSQL image
         working-directory: experiments/G7/ha
         run: docker compose -f compose.yaml build pg1
+
+  cluster-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare isolated lab credentials
+        working-directory: experiments/G7/ha
+        run: cp .env.example .env
+      - name: Start three-node Patroni cluster
+        working-directory: experiments/G7/ha
+        run: docker compose -f compose.yaml up -d --build
+      - name: Wait for quorum, leader, replicas, and HAProxy read/write
+        working-directory: experiments/G7/ha
+        env:
+          PATRONI_SUPERUSER_PASSWORD: local-only-change-me
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: bash smoke_test.sh
+      - name: Preserve cluster diagnostics
+        if: always()
+        working-directory: experiments/G7/ha
+        run: |
+          docker compose -f compose.yaml ps > ha-smoke-status.log || true
+          docker compose -f compose.yaml logs --no-color > ha-smoke-compose-final.log || true
+      - name: Upload smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g7-ha-smoke-evidence
+          path: |
+            experiments/G7/ha/ha-smoke-compose.log
+            experiments/G7/ha/ha-smoke-status.log
+            experiments/G7/ha/ha-smoke-compose-final.log
+          if-no-files-found: warn
+      - name: Tear down cluster
+        if: always()
+        working-directory: experiments/G7/ha
+        run: docker compose -f compose.yaml down -v --remove-orphans
