@@ -67,6 +67,21 @@ class TemporalPolicyTests(unittest.TestCase):
         result=evaluate(events,ENT)
         self.assertFalse(result["decisions"][1]["allowed"])
         self.assertTrue(result["decisions"][2]["allowed"])
+
+    def test_security_admin_without_admin_entitlement_cannot_update_policy(self):
+        events=[self.grant(),ev(2,"policy_update",actor="security_admin",version=2)]
+        result=evaluate(events,{"security_admin":["read","write"]})
+        self.assertFalse(result["decisions"][-1]["allowed"])
+        self.assertEqual(result["policy_version"],1)
+
+    def test_revoke_requires_actor_field(self):
+        with self.assertRaises(TraceError):
+            evaluate([self.grant(),ev(2,"revoke",grant_id="g1")],ENT)
+
+    def test_delegate_requires_actor_field(self):
+        with self.assertRaises(TraceError):
+            evaluate([self.grant(),ev(2,"delegate",source_grant_id="g1",
+                grant_id="g2",principal="bob",scopes=["read"],expires_at=10)],ENT)
     def test_export_approval_is_bound_to_resource_and_recipient(self):
         events=[self.grant(),self.read(),ev(3,"workflow_request",workflow_id="w",requester="alice",revision=1),
           ev(4,"approve",workflow_id="w",approver="bob",revision=1,policy_version=1,action="export",
@@ -92,6 +107,9 @@ class TemporalPolicyTests(unittest.TestCase):
     def test_specification_event_vocabulary_matches_evaluator(self):
         spec=json.loads((Path(__file__).with_name("policy_spec.json")).read_text())
         self.assertEqual(set(spec["event_types"]), set(EVENT_TYPES))
+        self.assertIn("actor", spec["event_contract"]["required_by_event"]["policy_update"])
+        self.assertIn("actor", spec["event_contract"]["required_by_event"]["revoke"])
+        self.assertIn("actor", spec["event_contract"]["required_by_event"]["delegate"])
 
     def test_boolean_policy_version_is_not_accepted_as_integer(self):
         event=self.grant()
