@@ -14,6 +14,22 @@ ENTITLEMENTS={"security_admin":["read","write","admin"]}
 SCENARIOS=("benign_admin","revoked_grant","expired_grant","stale_policy_read",
            "stale_delegation","export_subject_substitution","sod_violation")
 
+# A motif is a contiguous event-type pattern, not a scenario label. It is
+# descriptive only: its presence does not imply that a trace is safe or unsafe.
+MOTIF_EVENT_PATTERNS=(
+    ("grant","assume_admin"),
+    ("workflow_request","approve","export"),
+    ("workflow_request","approve","pay"),
+)
+
+def has_motif_like_subsequence(events:list[dict])->bool:
+    event_types=tuple(event.get("type") for event in events)
+    return any(
+        event_types[i:i+len(pattern)]==pattern
+        for pattern in MOTIF_EVENT_PATTERNS
+        for i in range(len(event_types)-len(pattern)+1)
+    )
+
 def _event(t, typ, **kw):
     return {"time":t,"sequence":0,"type":typ,**kw}
 
@@ -44,12 +60,10 @@ def make_episode(seed:int, episode_id:int, scenario:str|None=None)->dict:
     if scenario=="benign_admin":
         events.extend([_base_grant(t,"target","alice","admin",t+20),
             _event(t+1,"assume_admin",grant_id="target",principal="alice",scope="admin",tenant="tenant-a")])
-        motif_like=True
     elif scenario=="revoked_grant":
         events.extend([_base_grant(t,"target","alice","admin",t+20),
             _event(t+1,"revoke",grant_id="target"),
             _event(t+2,"assume_admin",grant_id="target",principal="alice",scope="admin",tenant="tenant-a")])
-        motif_like=False
     elif scenario=="expired_grant":
         events.extend([_base_grant(t,"target","alice","read",t+1),
             _event(t+1,"read",grant_id="target",principal="alice",scope="read",tenant="tenant-a",
@@ -85,6 +99,7 @@ def make_episode(seed:int, episode_id:int, scenario:str|None=None)->dict:
         motif_like=True
     # Deterministic event ordering; times are strictly increasing.
     events.sort(key=lambda e:(e["time"],e["sequence"]))
+    motif_like=has_motif_like_subsequence(events)
     result=evaluate(events,ENTITLEMENTS)
     first_bad=next((i for i,d in enumerate(result["decisions"]) if not d["allowed"]),None)
     prefix=events[:first_bad+1] if first_bad is not None else []
