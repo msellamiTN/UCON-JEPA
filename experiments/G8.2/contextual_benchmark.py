@@ -132,7 +132,7 @@ def main():
     args = p.parse_args()
     result = run()
     args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "contextual_metrics.json").write_text(json.dumps(result, indent=2) + "\\n")
+    (args.out / "contextual_metrics.json").write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
 
 if __name__ == "__main__":
