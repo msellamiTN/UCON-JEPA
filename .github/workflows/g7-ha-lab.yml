@@ -48,6 +48,16 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: bash smoke_test.sh
+          env:
+            KEEP_CLUSTER: "1"
+      - name: Guarded primary process crash experiment
+        working-directory: experiments/G7/ha
+        if: success()
+        env:
+          PATRONI_SUPERUSER_PASSWORD: local-only-change-me
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: bash primary_crash_experiment.sh
       - name: Preserve cluster diagnostics
         if: always()
         working-directory: experiments/G7/ha
@@ -63,6 +73,7 @@ jobs:
             experiments/G7/ha/ha-smoke-compose.log
             experiments/G7/ha/ha-smoke-status.log
             experiments/G7/ha/ha-smoke-compose-final.log
+            experiments/G7/ha/ha-primary-crash-results.env
           if-no-files-found: warn
       - name: Tear down cluster
         if: always()
