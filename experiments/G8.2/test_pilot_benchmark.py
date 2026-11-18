@@ -1,0 +1,29 @@
+import unittest
+from pilot_benchmark import episode, violation, make_dataset, split
+
+class PilotTests(unittest.TestCase):
+    def test_deterministic_episode(self):
+        self.assertEqual(episode(123, "iam"), episode(123, "iam"))
+
+    def test_ordered_motif_labels(self):
+        self.assertTrue(violation("iam", ["grant_role", "assume_admin"]))
+        self.assertFalse(violation("iam", ["assume_admin", "grant_role"]))
+        self.assertTrue(violation("data", ["read_sensitive", "export_sensitive"]))
+        self.assertFalse(violation("data", ["export_sensitive", "read_sensitive"]))
+        self.assertTrue(violation("sod", ["request", "approve", "pay"]))
+        self.assertFalse(violation("sod", ["request", "pay", "approve"]))
+        self.assertFalse(violation("sod", ["request", "pay"]))
+
+    def test_episode_split_no_leakage(self):
+        train, val, test = split(make_dataset(11, 20))
+        train_ids = {r["episode_id"] for r in train}
+        val_ids = {r["episode_id"] for r in val}
+        test_ids = {r["episode_id"] for r in test}
+        self.assertFalse(train_ids & val_ids)
+        self.assertFalse(train_ids & test_ids)
+        self.assertFalse(val_ids & test_ids)
+        self.assertTrue(val_ids)
+        self.assertTrue(test_ids)
+
+if __name__ == "__main__":
+    unittest.main()
