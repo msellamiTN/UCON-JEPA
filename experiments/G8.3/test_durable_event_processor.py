@@ -164,6 +164,20 @@ class TransactionalReplayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ProvenanceError, "replayed event_id"):
             recovered.process([envelope], self.keys)
 
+    def test_finite_crash_safety_model_has_no_invariant_counterexample(self):
+        from crash_consistency_model import explore
+        result = explore()
+        self.assertGreater(result["visited_states"], 0)
+        self.assertEqual(result["counterexamples"], [])
+
+    def test_finite_model_detects_event_only_commit_mutant(self):
+        from crash_consistency_model import explore
+        result = explore(include_unsafe_mutant=True)
+        self.assertTrue(result["counterexamples"])
+        first = result["counterexamples"][0]
+        self.assertIn("AtomicEventEvaluation", first["violations"])
+        self.assertIn("UnsafeCommitEventOnly", first["trace"])
+
 
 if __name__ == "__main__":
     unittest.main()
