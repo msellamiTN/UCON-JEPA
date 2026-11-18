@@ -85,6 +85,43 @@ jobs:
           run_mutant M3 formal/tla/G6_M3_UconDisabled.cfg NoUnauthorizedAcceptance
           run_mutant M4 formal/tla/G6_M4_VerificationDisabled.cfg CommitRequiresVerification
 
+      - name: Parse G8.3.11 crash consistency model
+        shell: bash
+        run: |
+          set -o pipefail
+          java -cp .tools/tla2tools.jar tla2sany.SANY formal/tla/G8_3_11_CrashConsistency.tla \
+            2>&1 | tee artifacts/g8-3-11-sany.log
+
+      - name: Run G8.3.11 crash consistency TLC model
+        shell: bash
+        run: |
+          set -o pipefail
+          java -XX:+UseParallelGC -Xmx3g -jar .tools/tla2tools.jar \
+            -config formal/tla/G8_3_11_CrashConsistency.cfg \
+            -workers 1 \
+            formal/tla/G8_3_11_CrashConsistency.tla \
+            2>&1 | tee artifacts/g8-3-11-tlc.log
+
+      - name: Verify G8.3.11 atomicity mutant is detected
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="artifacts/g8-3-11-atomicity-mutant.log"
+          if java -XX:+UseParallelGC -Xmx3g -jar .tools/tla2tools.jar \
+            -config formal/tla/G8_3_11_CrashConsistency_mutant.cfg \
+            -workers 1 \
+            formal/tla/G8_3_11_CrashConsistency.tla >"$log" 2>&1; then
+            echo "ERROR: G8.3.11 atomicity mutant unexpectedly passed."
+            cat "$log"
+            exit 1
+          fi
+          if ! grep -q "AtomicEventEvaluation" "$log"; then
+            echo "ERROR: G8.3.11 mutant failed for an unexpected reason."
+            cat "$log"
+            exit 1
+          fi
+          echo "G8.3.11 atomicity mutant: expected invariant violation detected."
+
       - name: Upload model-checking logs
         if: always()
         uses: actions/upload-artifact@v4
