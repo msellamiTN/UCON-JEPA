@@ -106,3 +106,31 @@ The six paired cases are an oracle/mechanics validation, not a statistical
 efficacy study. The next benchmark expansion must introduce randomized contexts,
 state distributions, adversarial and benign edge cases, and independently
 reviewed policy specifications before predictive-model comparisons.
+
+
+## Independent randomized policy-oracle differential audit v0.1
+
+`independent_oracle_audit.py` adds a batch reference evaluator that does not
+call the online gate's `policy_step` or `apply_action` functions. It evaluates
+the complete trace using separately expressed context and prefix-history
+constraints, then compares the resulting unsafe/safe decision with the
+stateful reactive gate.
+
+The CI campaign evaluates 2,000 seeded random contexts per family (6,000 total)
+for the current IAM, data-export, and SoD traces. It persists the seed, contexts,
+trace, oracle result, gate result, and any mismatches in
+`independent_oracle_audit.json`. A mismatch fails the run and is retained in
+the generated output when available.
+
+This reduces direct implementation circularity but does **not** establish that
+the policy specification itself is correct, complete, or representative.
+Both implementations may encode the same mistaken policy interpretation.
+Temporal revocation, policy version changes, delegation, retries, partial
+workflows, and multi-action trace distributions remain out of scope. Zero
+mismatches means differential implementation agreement on this generated
+finite sample, not a security guarantee or JEPA result.
+
+Run:
+```bash
+python experiments/G8.2/independent_oracle_audit.py --seed 20261118 --cases-per-family 2000 --out experiments/G8.2/independent-oracle-output
+```
