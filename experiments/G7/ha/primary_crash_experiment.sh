@@ -20,8 +20,16 @@ primary_nodes() {
 }
 
 psql_haproxy() {
-  "${dc[@]}" exec -T pg1 env PGPASSWORD="$PATRONI_SUPERUSER_PASSWORD" \
-    psql -h haproxy -p 5000 -U ucon_admin -d postgres -v ON_ERROR_STOP=1 "$@"
+  local node
+  for node in pg1 pg2 pg3; do
+    if output=$("${dc[@]}" exec -T "$node" env PGPASSWORD="$PATRONI_SUPERUSER_PASSWORD" \
+      psql -h haproxy -p 5000 -U ucon_admin -d postgres -v ON_ERROR_STOP=1 "$@" 2>/dev/null); then
+      printf '%s\n' "$output"
+      return 0
+    fi
+  done
+  echo "No running PostgreSQL container could reach HAProxy" >&2
+  return 1
 }
 
 echo "[1/6] Confirm exactly one primary before fault injection"
