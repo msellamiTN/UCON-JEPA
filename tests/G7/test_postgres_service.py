@@ -59,8 +59,16 @@ class PostgresServiceIntegrationTests(unittest.TestCase):
         with self.assertRaises(IdempotencyConflict):
             self.admin.mutate(**{**cmd, "payload": b"different"})
 
-    def test_revocation_fences_subsequent_mutation(self):
-        self.admin.revoke(self.principal)
+    def test_revocation_fences_subsequent_mutation_and_audits_writer_epoch(self):
+        writer_epoch = self.admin.current_writer_epoch()
+        _, _, sequence = self.admin.revoke(self.principal)
+        with self.admin._connect() as conn:
+            event = conn.execute(
+                "SELECT event_type,writer_epoch FROM ucon_events WHERE sequence=%s",
+                (sequence,),
+            ).fetchone()
+        self.assertEqual(event["event_type"], "REVOKE")
+        self.assertEqual(event["writer_epoch"], writer_epoch)
         snap = self.admin.snapshot(self.resource)
         result = self.admin.mutate(**self.command(snap))
         self.assertEqual(result.outcome, "DENIED")
