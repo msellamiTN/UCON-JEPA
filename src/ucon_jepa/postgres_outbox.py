@@ -38,12 +38,17 @@ class PostgresOutbox:
             raise ValueError("limit must be positive and lease_seconds non-negative")
         with self.service._connect() as conn:
             with conn.cursor() as cur:
+                event_filter = "AND event_id=%s" if event_id is not None else ""
+                parameters = (
+                    (event_id, limit, lease_seconds)
+                    if event_id is not None else (limit, lease_seconds)
+                )
                 rows = cur.execute(
-                    """
+                    f"""
                     WITH candidates AS (
                         SELECT event_id FROM ucon_outbox
                         WHERE delivered_at IS NULL
-                          AND (%s IS NULL OR event_id=%s)
+                          {event_filter}
                           AND available_at <= clock_timestamp()
                           AND (lease_until IS NULL OR lease_until <= clock_timestamp())
                         ORDER BY created_at, event_id
@@ -57,7 +62,7 @@ class PostgresOutbox:
                     WHERE o.event_id = c.event_id
                     RETURNING o.event_id, o.event_type, o.payload, o.attempts
                     """,
-                    (event_id, event_id, limit, lease_seconds),
+                    parameters,
                 ).fetchall()
                 return [
                     OutboxEvent(
