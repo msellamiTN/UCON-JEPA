@@ -62,7 +62,7 @@ class PostgresOutboxTests(unittest.TestCase):
 
     def test_receiver_applies_local_effect_once_under_duplicate_delivery(self):
         invocation, _ = self.create_accepted_event()
-        events = self.outbox.claim(limit=100, lease_seconds=30)
+        events = self.outbox.claim(limit=100, lease_seconds=30, event_id=invocation)
         event = next(item for item in events if item.event_id == invocation)
         self.assertTrue(self.receiver.process(event))
         self.assertFalse(self.receiver.process(event))
@@ -75,7 +75,7 @@ class PostgresOutboxTests(unittest.TestCase):
 
     def test_receiver_rejects_same_event_id_with_changed_payload(self):
         invocation, _ = self.create_accepted_event()
-        events = self.outbox.claim(limit=100, lease_seconds=30)
+        events = self.outbox.claim(limit=100, lease_seconds=30, event_id=invocation)
         event = next(item for item in events if item.event_id == invocation)
         self.assertTrue(self.receiver.process(event))
         altered = OutboxEvent(
@@ -88,11 +88,11 @@ class PostgresOutboxTests(unittest.TestCase):
 
     def test_crash_after_send_before_ack_causes_redelivery_but_no_duplicate_effect(self):
         invocation, _ = self.create_accepted_event()
-        first_claim = self.outbox.claim(limit=100, lease_seconds=0)
+        first_claim = self.outbox.claim(limit=100, lease_seconds=0, event_id=invocation)
         event = next(item for item in first_claim if item.event_id == invocation)
         self.assertTrue(self.receiver.process(event))
         # Simulates publisher crash after receiver commit and before outbox ack.
-        second_claim = self.outbox.claim(limit=100, lease_seconds=0)
+        second_claim = self.outbox.claim(limit=100, lease_seconds=0, event_id=invocation)
         redelivered = next(item for item in second_claim if item.event_id == invocation)
         self.assertFalse(self.receiver.process(redelivered))
         self.assertTrue(self.outbox.acknowledge(
@@ -104,9 +104,9 @@ class PostgresOutboxTests(unittest.TestCase):
 
     def test_stale_lease_holder_cannot_acknowledge_newer_claim(self):
         invocation, _ = self.create_accepted_event()
-        old_claim = self.outbox.claim(limit=100, lease_seconds=0)
+        old_claim = self.outbox.claim(limit=100, lease_seconds=0, event_id=invocation)
         old_event = next(item for item in old_claim if item.event_id == invocation)
-        new_claim = self.outbox.claim(limit=100, lease_seconds=0)
+        new_claim = self.outbox.claim(limit=100, lease_seconds=0, event_id=invocation)
         new_event = next(item for item in new_claim if item.event_id == invocation)
         self.assertGreater(new_event.attempts, old_event.attempts)
         self.assertFalse(self.outbox.acknowledge(
@@ -125,7 +125,9 @@ class PostgresOutboxTests(unittest.TestCase):
                 seen.append(event.event_id)
                 self.receiver.process(event)
 
-        sent, failed = self.outbox.deliver_once(send, limit=100, lease_seconds=0)
+        sent, failed = self.outbox.deliver_once(
+            send, limit=100, lease_seconds=0, event_id=invocation
+        )
         self.assertGreaterEqual(sent, 1)
         self.assertEqual(failed, 0)
         self.assertIn(invocation, seen)
@@ -143,7 +145,7 @@ class PostgresOutboxTests(unittest.TestCase):
             raise RuntimeError("simulated downstream outage")
 
         sent, failed = self.outbox.deliver_once(
-            fail, limit=100, lease_seconds=0
+            fail, limit=100, lease_seconds=0, event_id=invocation
         )
         self.assertGreaterEqual(failed, 1)
         self.assertGreaterEqual(sent, 0)
