@@ -237,7 +237,7 @@ class PostgresUconService:
         self, *, invocation_id: str, principal: str, action: str,
         resource_id: str, expected_resource_version: int,
         expected_policy_version: int, expected_authorization_epoch: int,
-        payload: bytes,
+        payload: bytes, expected_writer_epoch: int | None = None,
     ) -> MutationResult:
         if not all((invocation_id, principal, action, resource_id)):
             raise ValueError("invocation and authorization binding fields are required")
@@ -346,4 +346,27 @@ class PostgresUconService:
                 self.fault_hook("after_commit")
             return MutationResult(
                 invocation_id, outcome, reason, new_version, pv, epoch, seq, receipt, False
+            )
+
+    def lookup_invocation(self, invocation_id: str) -> MutationResult | None:
+        """Read the recorded outcome on the current authoritative database.
+
+        A missing row after failover is not proof that a previously acknowledged
+        commit never happened unless the deployment's replication/RPO contract
+        guarantees that acknowledged commits survive promotion.
+        """
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM ucon_invocations WHERE invocation_id=%s",
+                (invocation_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            return MutationResult(
+                invocation_id=row["invocation_id"], outcome=row["outcome"],
+                reason=row["reason"], resource_version=row["resource_version"],
+                policy_version=row["policy_version"],
+                authorization_epoch=row["authorization_epoch"],
+                event_sequence=row["event_sequence"], receipt_id=row["receipt_id"],
+                replayed=True,
             )
