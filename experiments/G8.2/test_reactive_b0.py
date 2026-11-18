@@ -19,7 +19,7 @@ class ReactiveB0Tests(unittest.TestCase):
                 result=simulate_reactive_gate(["read"]+motif+["audit"],family)
                 self.assertEqual(result["blocked_count"],1)
                 self.assertFalse(result["unsafe_completion"])
-                self.assertNotIn(motif[-1],result["blocked_actions"] if motif[-1]!="read" else [])
+                self.assertEqual(result["blocked_actions"],[motif[-1]])
 
     def test_safe_trace_has_no_intervention(self):
         for family in MOTIFS:
