@@ -3,6 +3,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -220,13 +221,13 @@ class TransactionalReplayLedgerTests(unittest.TestCase):
             )
             processes.append((process, ready_file))
 
-        deadline = __import__("time").monotonic() + 30
+        deadline = time.monotonic() + 30
         while not all(ready_file.exists() for _, ready_file in processes):
             if __import__("time").monotonic() > deadline:
                 for process, _ in processes:
                     process.kill()
                 self.fail("worker processes did not all reach the start barrier")
-            __import__("time").sleep(0.01)
+            time.sleep(0.01)
 
         start_file.touch()
         outcomes = []
