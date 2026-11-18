@@ -59,7 +59,11 @@ class TemporalPolicyTests(unittest.TestCase):
           ev(2,"approve",workflow_id="w",approver="bob",revision=1,policy_version=1,action="pay",principal="alice",resource_id="invoice1",recipient="vendor"),
           ev(3,"pay",workflow_id="w",payer="alice",revision=1)]
         self.assertFalse(evaluate(events)["decisions"][-1]["allowed"])
-    def test_specification_event_vocabulary_matches_evaluator(self):\n        spec=json.loads((Path(__file__).with_name("policy_spec.json")).read_text())\n        self.assertEqual(set(spec["event_types"]), set(EVENT_TYPES))\n\n    def test_unknown_event_rejected(self):
+    def test_specification_event_vocabulary_matches_evaluator(self):
+        spec=json.loads((Path(__file__).with_name("policy_spec.json")).read_text())
+        self.assertEqual(set(spec["event_types"]), set(EVENT_TYPES))
+
+    def test_unknown_event_rejected(self):
         with self.assertRaises(TraceError): evaluate([ev(1,"mystery")])
     def test_nonmonotonic_order_rejected(self):
         with self.assertRaises(TraceError): evaluate([ev(2,"policy_update",version=2),ev(1,"policy_update",version=3)])
