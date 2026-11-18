@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""G8.3.1 temporal UCON reference semantics (research model, not production)."""
+"""G8.3 temporal UCON reference semantics with strict event-schema validation."""
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
