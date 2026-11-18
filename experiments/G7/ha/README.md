@@ -1,6 +1,6 @@
 # G7.8 PostgreSQL HA lab (Patroni + etcd)
 
-**Status: Compose model and Patroni image build passed CI; the multi-node runtime smoke test is now automated and awaiting its first execution.**
+**Status: Compose model and Patroni image build passed CI. The first live smoke-test attempt exposed missing replication HBA rules and a mounted data-directory layout issue; both were corrected, and the rerun is pending. No runtime HA acceptance is claimed yet.**
 
 This lab is intentionally separate from the single-primary PostgreSQL CI service. It provisions three PostgreSQL/Patroni nodes, a three-member etcd quorum, and HAProxy routing to the Patroni primary.
 
@@ -123,7 +123,7 @@ docker compose -f compose.yaml down -v
 ## Limitations
 
 - This Compose topology places all nodes on one Docker host and one bridge network; it does not model independent availability zones or host failures.
-- The first CI validation confirmed Compose syntax and image build. Runtime cluster startup, quorum, streaming replication, and HAProxy read/write smoke checks are now automated; their results must be reviewed before claiming those properties.\n- The lab has not been partition-tested or subjected to a controlled promotion campaign.
+- The first CI validation confirmed Compose syntax and image build. The first runtime attempt started the containers but failed to establish streaming replication: PostgreSQL reported no matching `pg_hba.conf` entry for the replication user. Patroni also could not rename the data directory because it was mounted at the mount-point root. The configuration now adds explicit replication/client HBA rules and moves `data_dir` into a child directory of the mounted volume. The corrected runtime rerun is pending.\n- The lab has not been partition-tested or subjected to a controlled promotion campaign.
 - Patroni/etcd election is not by itself proof of safe storage fencing under arbitrary partitions.
 - Do not treat the writer_epoch field as an external fencing mechanism. The former primary must be demonstrably unable to accept protected writes.
 - No G7.8 RPO, RTO, split-brain, or HA result is claimed until raw trial evidence is committed.
