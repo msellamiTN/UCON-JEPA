@@ -75,8 +75,11 @@ class PostgresUconService:
             sequence BIGSERIAL PRIMARY KEY, event_type TEXT NOT NULL,
             invocation_id TEXT, principal TEXT, action TEXT, resource_id TEXT,
             outcome TEXT NOT NULL, policy_version BIGINT NOT NULL,
-            authorization_epoch BIGINT NOT NULL, resource_version BIGINT
+            authorization_epoch BIGINT NOT NULL, resource_version BIGINT,
+            writer_epoch BIGINT NOT NULL DEFAULT 1
         );
+        ALTER TABLE ucon_events ADD COLUMN IF NOT EXISTS
+            writer_epoch BIGINT NOT NULL DEFAULT 1;
         CREATE TABLE IF NOT EXISTS ucon_invocations (
             invocation_id TEXT PRIMARY KEY, command_digest TEXT NOT NULL,
             outcome TEXT NOT NULL, reason TEXT NOT NULL,
@@ -198,9 +201,10 @@ class PostgresUconService:
                 ).fetchone()
                 seq = cur.execute(
                     "INSERT INTO ucon_events(event_type,outcome,policy_version,"
-                    "authorization_epoch) VALUES('REVOKE','COMMITTED',%s,%s) "
-                    "RETURNING sequence",
-                    (state["policy_version"], state["authorization_epoch"]),
+                    "authorization_epoch,writer_epoch) "
+                    "VALUES('REVOKE','COMMITTED',%s,%s,%s) RETURNING sequence",
+                    (state["policy_version"], state["authorization_epoch"],
+                     state["writer_epoch"]),
                 ).fetchone()["sequence"]
                 return state["policy_version"], state["authorization_epoch"], seq
 
@@ -317,10 +321,11 @@ class PostgresUconService:
 
                 seq = cur.execute(
                     "INSERT INTO ucon_events(event_type,invocation_id,principal,action,"
-                    "resource_id,outcome,policy_version,authorization_epoch,resource_version) "
-                    "VALUES('MUTATION',%s,%s,%s,%s,%s,%s,%s,%s) RETURNING sequence",
+                    "resource_id,outcome,policy_version,authorization_epoch,resource_version,"
+                    "writer_epoch) VALUES('MUTATION',%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                    "RETURNING sequence",
                     (invocation_id, principal, action, resource_id, outcome,
-                     pv, epoch, new_version),
+                     pv, epoch, new_version, state["writer_epoch"]),
                 ).fetchone()["sequence"]
                 cur.execute(
                     "INSERT INTO ucon_invocations VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)",
@@ -337,6 +342,7 @@ class PostgresUconService:
                             "resource_version": new_version, "receipt_id": receipt,
                             "policy_version": pv, "authorization_epoch": epoch,
                             "event_sequence": seq,
+                            "writer_epoch": state["writer_epoch"],
                         })),
                     )
                 if self.fault_hook:
