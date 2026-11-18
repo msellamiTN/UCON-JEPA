@@ -36,6 +36,31 @@ CrashProcessor(database).process(json.loads(envelopes_json), json.loads(keys_jso
 """
 
 
+_PROCESS_RACE_SCRIPT = r"""
+import json
+import sys
+import time
+from pathlib import Path
+from durable_event_processor import SQLiteEventProcessor
+from event_provenance import ProvenanceError
+
+database, envelope_json, keys_json, ready_file, start_file = sys.argv[1:]
+processor = SQLiteEventProcessor(database)
+Path(ready_file).touch()
+deadline = time.monotonic() + 20
+while not Path(start_file).exists():
+    if time.monotonic() > deadline:
+        raise SystemExit("timed out waiting for concurrent start gate")
+    time.sleep(0.005)
+
+try:
+    result = processor.process([json.loads(envelope_json)], json.loads(keys_json))
+    print(json.dumps({"committed": True, "evaluation_id": result["evaluation_id"]}))
+except ProvenanceError as exc:
+    print(json.dumps({"committed": False, "reason": str(exc)}))
+"""
+
+
 class TransactionalReplayLedgerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -177,6 +202,62 @@ class TransactionalReplayLedgerTests(unittest.TestCase):
         first = result["counterexamples"][0]
         self.assertIn("AtomicEventEvaluation", first["violations"])
         self.assertIn("UnsafeCommitEventOnly", first["trace"])
+
+
+    def run_process_race(self, envelopes):
+        ready_dir = Path(self.temp.name) / "ready"
+        ready_dir.mkdir(exist_ok=True)
+        start_file = Path(self.temp.name) / "start-race"
+        processes = []
+        for index, envelope in enumerate(envelopes):
+            ready_file = ready_dir / f"ready-{index}"
+            process = subprocess.Popen(
+                [sys.executable, "-c", _PROCESS_RACE_SCRIPT,
+                 str(self.database), json.dumps(envelope), json.dumps(self.keys),
+                 str(ready_file), str(start_file)],
+                cwd=Path(__file__).resolve().parent,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            processes.append((process, ready_file))
+
+        deadline = __import__("time").monotonic() + 30
+        while not all(ready_file.exists() for _, ready_file in processes):
+            if __import__("time").monotonic() > deadline:
+                for process, _ in processes:
+                    process.kill()
+                self.fail("worker processes did not all reach the start barrier")
+            __import__("time").sleep(0.01)
+
+        start_file.touch()
+        outcomes = []
+        for process, _ in processes:
+            stdout, stderr = process.communicate(timeout=40)
+            self.assertEqual(process.returncode, 0, stderr)
+            lines = [line for line in stdout.splitlines() if line.strip()]
+            self.assertTrue(lines, f"worker produced no result; stderr={stderr}")
+            outcomes.append(json.loads(lines[-1]))
+        return outcomes
+
+    def test_independent_processes_duplicate_delivery_commits_at_most_once(self):
+        envelope = self.signed(self.workflow_event("multiprocess-duplicate"), "mp-duplicate-e1")
+        outcomes = self.run_process_race([envelope] * 4)
+        self.assertEqual(sum(item["committed"] for item in outcomes), 1)
+        self.assertEqual(sum(not item["committed"] for item in outcomes), 3)
+        self.assertEqual(self.processor.counts(), {"processed_events": 1, "evaluations": 1})
+        self.assertEqual(self.assert_database_healthy(), (["mp-duplicate-e1"], 1))
+
+    def test_independent_processes_distinct_events_all_commit(self):
+        envelopes = [
+            self.signed(self.workflow_event(f"multiprocess-distinct-{i}"), f"mp-distinct-e{i}")
+            for i in range(4)
+        ]
+        outcomes = self.run_process_race(envelopes)
+        self.assertEqual(sum(item["committed"] for item in outcomes), 4)
+        self.assertEqual(self.processor.counts(), {"processed_events": 4, "evaluations": 4})
+        self.assertEqual(
+            self.assert_database_healthy(),
+            ([f"mp-distinct-e{i}" for i in range(4)], 4),
+        )
 
 
 if __name__ == "__main__":
