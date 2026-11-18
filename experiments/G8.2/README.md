@@ -53,7 +53,7 @@ result is scientifically acceptable.
 `reactive_b0.py` implements an authoritative motif-based action gate. It denies only the action that would complete a configured unsafe ordered motif (the in-distribution motif or the held-out motif). It is reactive: it does not predict future violations, and it is not JEPA. This baseline is intended to establish the prevention/false-intervention floor before predictive models are compared.
 
 
-The CI workflow also runs `reactive_b0_benchmark.py` against the compositional test partition and retains `b0_reactive_metrics.json`. The false-intervention rate is explicitly reported as not estimable because the current test partition injects an unsafe motif into every episode; a benign test cohort is required for that metric.
+The CI workflow also runs `reactive_b0_benchmark.py` against the compositional test partition and retains `b0_reactive_metrics.json`. The original compositional-only evaluator reports false-intervention rate as not estimable because its test episodes are all unsafe. The separate mixed-cohort evaluator provides the first benign false-intervention estimate.
 
 Run the B0 evaluator manually:
 ```bash
@@ -74,3 +74,7 @@ Run:
 ```bash
 python experiments/G8.2/mixed_b0_benchmark.py --seed 2026 --episodes-per-family 100 --out experiments/G8.2/output
 ```
+
+### Initial mixed-cohort result (seed 2026)
+
+CI run #28 completed successfully. Each family had 20 test episodes (10 benign, 10 unsafe). B0 blocked all 30 unsafe episodes and intervened in none of the 30 benign episodes. Pooled Wilson 95% intervals: prevention recall 0.886–1.000; false-intervention rate 0.000–0.114. These small synthetic samples are not evidence of real-world security performance; the benign class is motif-free by construction and B0 uses the same motifs as the labels.
