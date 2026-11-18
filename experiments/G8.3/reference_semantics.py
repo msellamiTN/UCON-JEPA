@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-class TraceError(ValueError): pass
+EVENT_TYPES = frozenset({"policy_update","grant","revoke","delegate","assume_admin","read","workflow_request","workflow_amend","approve","export","pay"})\n\nclass TraceError(ValueError): pass
 
 @dataclass
 class State:
