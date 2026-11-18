@@ -55,7 +55,7 @@ class IndependentTemporalOracleTests(unittest.TestCase):
         result = run_campaign(seed=8304, episodes=500)
         self.assertEqual(result["episodes"], 500)
         self.assertGreater(result["event_count"], 500)
-        self.assertEqual(result["mismatch_count"], 0)
+        self.assertEqual(result["mismatch_count"], 0, repr(result["counterexamples"][:1]))
         self.assertEqual(result["agreement"], 1.0)
 
 
