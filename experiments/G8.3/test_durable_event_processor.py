@@ -1,4 +1,7 @@
 import base64
+import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -12,10 +15,32 @@ from durable_event_processor import SQLiteEventProcessor
 from event_provenance import ProvenanceError, sign_event
 
 
+# The child process exits without Python cleanup at the selected transaction
+# boundary. This exercises SQLite/WAL recovery after abrupt process death.
+_CRASH_SCRIPT = r"""
+import json
+import os
+import sys
+from durable_event_processor import SQLiteEventProcessor
+
+mode, database, envelopes_json, keys_json = sys.argv[1:]
+class CrashProcessor(SQLiteEventProcessor):
+    def _before_commit(self, connection):
+        if mode == "before_commit":
+            os._exit(71)
+    def _after_commit(self, connection):
+        if mode == "after_commit":
+            os._exit(72)
+
+CrashProcessor(database).process(json.loads(envelopes_json), json.loads(keys_json))
+"""
+
+
 class TransactionalReplayLedgerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.processor = SQLiteEventProcessor(Path(self.temp.name) / "events.sqlite")
+        self.database = Path(self.temp.name) / "events.sqlite"
+        self.processor = SQLiteEventProcessor(self.database)
         self.private = Ed25519PrivateKey.generate()
         public = self.private.public_key().public_bytes(
             serialization.Encoding.Raw, serialization.PublicFormat.Raw
@@ -33,17 +58,37 @@ class TransactionalReplayLedgerTests(unittest.TestCase):
         return sign_event(event, issuer="security_admin", key_id="admin-k1",
                           event_id=event_id, private_key=self.private)
 
+    def workflow_event(self, workflow_id="w1"):
+        return {"time": 1, "sequence": 0, "type": "workflow_request",
+                "workflow_id": workflow_id, "requester": "alice", "revision": 1}
+
+    def crash_child(self, mode, envelope):
+        completed = subprocess.run(
+            [sys.executable, "-c", _CRASH_SCRIPT, mode, str(self.database),
+             json.dumps([envelope]), json.dumps(self.keys)],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True, text=True, timeout=20,
+        )
+        expected = 71 if mode == "before_commit" else 72
+        self.assertEqual(completed.returncode, expected, completed.stderr)
+
+    def assert_database_healthy(self):
+        import sqlite3
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            event_ids = connection.execute(
+                "SELECT event_id FROM processed_events ORDER BY event_id"
+            ).fetchall()
+            evaluation_count = connection.execute("SELECT COUNT(*) FROM evaluations").fetchone()[0]
+        return [row[0] for row in event_ids], evaluation_count
+
     def test_commit_stores_decision_and_replay_id_together(self):
-        request = {"time": 1, "sequence": 0, "type": "workflow_request",
-                   "workflow_id": "w1", "requester": "alice", "revision": 1}
-        result = self.processor.process([self.signed(request, "e1")], self.keys)
+        result = self.processor.process([self.signed(self.workflow_event(), "e1")], self.keys)
         self.assertTrue(result["committed"])
         self.assertEqual(self.processor.counts(), {"processed_events": 1, "evaluations": 1})
 
     def test_replay_is_rejected_without_partial_second_commit(self):
-        event = {"time": 1, "sequence": 0, "type": "workflow_request",
-                 "workflow_id": "w1", "requester": "alice", "revision": 1}
-        envelope = self.signed(event, "e1")
+        envelope = self.signed(self.workflow_event(), "e1")
         self.processor.process([envelope], self.keys)
         with self.assertRaisesRegex(ProvenanceError, "replayed event_id"):
             self.processor.process([envelope], self.keys)
@@ -65,9 +110,7 @@ class TransactionalReplayLedgerTests(unittest.TestCase):
         self.assertEqual(self.processor.counts(), {"processed_events": 1, "evaluations": 1})
 
     def test_concurrent_duplicate_delivery_commits_exactly_once(self):
-        event = {"time": 1, "sequence": 0, "type": "workflow_request",
-                 "workflow_id": "concurrent-w1", "requester": "alice", "revision": 1}
-        envelope = self.signed(event, "concurrent-e1")
+        envelope = self.signed(self.workflow_event("concurrent-w1"), "concurrent-e1")
         barrier = Barrier(2)
 
         def submit():
@@ -83,13 +126,43 @@ class TransactionalReplayLedgerTests(unittest.TestCase):
         self.assertEqual(self.processor.counts(), {"processed_events": 1, "evaluations": 1})
 
     def test_multi_event_trace_is_atomic_on_late_schema_failure(self):
-        good = {"time": 1, "sequence": 0, "type": "workflow_request",
-                "workflow_id": "w1", "requester": "alice", "revision": 1}
+        good = self.workflow_event("atomic-w1")
         bad = {"time": 2, "sequence": 0, "type": "grant", "actor": "security_admin"}
         envelopes = [self.signed(good, "good-e1"), self.signed(bad, "bad-e2")]
         with self.assertRaises(ValueError):
             self.processor.process(envelopes, self.keys, self.entitlements)
         self.assertEqual(self.processor.counts(), {"processed_events": 0, "evaluations": 0})
+
+    def test_crash_before_commit_leaves_no_partial_state_after_restart(self):
+        envelope = self.signed(self.workflow_event("crash-before"), "crash-before-e1")
+        self.crash_child("before_commit", envelope)
+        # Reopening the processor forces SQLite to recover its WAL/journal.
+        recovered = SQLiteEventProcessor(self.database)
+        self.assertEqual(recovered.counts(), {"processed_events": 0, "evaluations": 0})
+        self.assertEqual(self.assert_database_healthy(), ([], 0))
+        # The same signed event remains processable after the aborted attempt.
+        result = recovered.process([envelope], self.keys)
+        self.assertTrue(result["committed"])
+        self.assertEqual(recovered.counts(), {"processed_events": 1, "evaluations": 1})
+
+    def test_commit_then_lost_ack_is_recovered_as_replay(self):
+        envelope = self.signed(self.workflow_event("crash-after"), "crash-after-e1")
+        self.crash_child("after_commit", envelope)
+        recovered = SQLiteEventProcessor(self.database)
+        self.assertEqual(recovered.counts(), {"processed_events": 1, "evaluations": 1})
+        self.assertEqual(self.assert_database_healthy(), (["crash-after-e1"], 1))
+        with self.assertRaisesRegex(ProvenanceError, "replayed event_id"):
+            recovered.process([envelope], self.keys)
+        self.assertEqual(recovered.counts(), {"processed_events": 1, "evaluations": 1})
+
+    def test_restart_preserves_replay_history_and_evaluation_pairing(self):
+        envelope = self.signed(self.workflow_event("restart"), "restart-e1")
+        self.processor.process([envelope], self.keys)
+        recovered = SQLiteEventProcessor(self.database)
+        self.assertEqual(recovered.counts(), {"processed_events": 1, "evaluations": 1})
+        self.assertEqual(self.assert_database_healthy(), (["restart-e1"], 1))
+        with self.assertRaisesRegex(ProvenanceError, "replayed event_id"):
+            recovered.process([envelope], self.keys)
 
 
 if __name__ == "__main__":
