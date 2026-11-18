@@ -4,7 +4,7 @@ This is a **pipeline smoke pilot**, not the full G8.2 benchmark.
 
 ## What it tests
 - Deterministic episode generation across IAM, sensitive-data, and approval/payment workflow families.
-- Rule-based labels for unsafe patterns in the next 3 actions.
+- Ordered, contiguous rule-motif labels for unsafe patterns in the next 3 actions.
 - Episode-level deterministic split (windows from a single episode cannot leak across train/test).
 - A plain supervised logistic baseline using prefix features.
 - JSON metrics/manifests written to disk.
