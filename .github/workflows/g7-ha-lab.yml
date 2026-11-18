@@ -11,7 +11,6 @@ on:
       - "experiments/G7/ha/**"
       - ".github/workflows/g7-ha-lab.yml"
   workflow_dispatch:
-
 jobs:
   compose-validation:
     runs-on: ubuntu-latest
@@ -34,7 +33,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Prepare isolated lab credentials
         working-directory: experiments/G7/ha
-        run: cp .env.example .env
+        run: |
+          cat > .env <<'EOF'
+          PATRONI_SUPERUSER_PASSWORD=local-only-change-me
+          PATRONI_REPLICATION_PASSWORD=local-only-repl-change-me
+          EOF
       - name: Start three-node Patroni cluster
         working-directory: experiments/G7/ha
         run: docker compose -f compose.yaml up -d
