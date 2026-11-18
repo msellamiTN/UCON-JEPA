@@ -65,3 +65,12 @@ Tests cover motif-completion denial, safe-action acceptance, and safe traces wit
 ```bash
 python -m unittest discover -s experiments/G8.2 -p "test_*.py" -v
 ```
+
+## Mixed benign/unsafe cohort (B0)
+
+`mixed_b0_benchmark.py` creates a balanced test-only cohort (test episodes selected by index modulo 5) with benign episodes containing no unsafe motifs and unsafe episodes containing exactly one controlled motif. Unsafe motifs alternate between train and held-out motif variants. The reactive B0 gate is evaluated using episode-level prevention recall and benign false-intervention rate with Wilson 95% intervals. This cohort is synthetic and does not represent real policy context.
+
+Run:
+```bash
+python experiments/G8.2/mixed_b0_benchmark.py --seed 2026 --episodes-per-family 100 --out experiments/G8.2/output
+```
