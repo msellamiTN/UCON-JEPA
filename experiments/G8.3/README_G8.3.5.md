@@ -1,5 +1,9 @@
 # G8.3.5 — Actor-bound privileged temporal transitions
 
+## Integration note
+
+This branch now targets `main` directly and includes the strict event-schema validation changes from PR #9 in its comparison with `main`. This allows the combined semantic increment to be validated as one integration candidate rather than merging a duplicate stacked branch first.
+
 ## Finding
 
 The earlier temporal model validated grant scope, expiry and policy version but did not bind three state-changing event types to an authorized actor. A caller could attempt to delegate a grant using only its identifier; revoke and policy-update events also lacked actor authorization.
