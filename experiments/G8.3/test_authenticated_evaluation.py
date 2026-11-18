@@ -85,7 +85,7 @@ class AuthenticatedEvaluationTests(unittest.TestCase):
 
     def test_policy_schema_failure_does_not_return_replay_commit_token(self):
         # Signature is valid, but the event is malformed for the policy evaluator.
-        envelope = self.sign({"time": 1, "sequence": 0, "type": "grant"}, "e1")
+        envelope = self.sign({"time": 1, "sequence": 0, "type": "grant", "actor": "security_admin"}, "e1")
         with self.assertRaises(ValueError):
             evaluate_signed_trace([envelope], self.keys, self.entitlements)
 
