@@ -1,5 +1,6 @@
 import unittest
-from randomized_temporal_traces import campaign, make_episode, SCENARIOS
+from randomized_temporal_traces import campaign, make_episode, SCENARIOS, ENTITLEMENTS
+from reference_semantics import evaluate
 
 class RandomizedTemporalTraceTests(unittest.TestCase):
     def test_campaign_is_byte_reproducible(self):
@@ -25,7 +26,7 @@ class RandomizedTemporalTraceTests(unittest.TestCase):
             x=make_episode(55,2,scenario)
             if x["unsafe"]:
                 self.assertTrue(x["minimal_failing_prefix"])
-                self.assertFalse(x["minimal_failing_prefix"][-1].get("allowed",True))
+                prefix_result=evaluate(x["minimal_failing_prefix"],ENTITLEMENTS)\n                self.assertFalse(prefix_result["decisions"][-1]["allowed"])
                 self.assertEqual(len(x["minimal_failing_prefix"]),x["first_violation_index"]+1)
     def test_campaign_accounts_for_every_episode(self):
         data=campaign(seed=8302,episodes=100)
