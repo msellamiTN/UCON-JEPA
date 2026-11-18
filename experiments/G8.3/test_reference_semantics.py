@@ -64,6 +64,29 @@ class TemporalPolicyTests(unittest.TestCase):
         spec=json.loads((Path(__file__).with_name("policy_spec.json")).read_text())
         self.assertEqual(set(spec["event_types"]), set(EVENT_TYPES))
 
+    def test_boolean_policy_version_is_not_accepted_as_integer(self):
+        event=self.grant()
+        event["policy_version"]=True
+        with self.assertRaises(TraceError):
+            evaluate([event],ENT)
+
+    def test_boolean_workflow_revision_is_rejected(self):
+        with self.assertRaises(TraceError):
+            evaluate([ev(1,"workflow_request",workflow_id="w",requester="alice",revision=True)])
+
+    def test_unhashable_scope_is_rejected_as_trace_error(self):
+        event=self.grant(scopes=[["read"]])
+        with self.assertRaises(TraceError):
+            evaluate([event],ENT)
+
+    def test_malformed_trusted_entitlements_are_rejected(self):
+        with self.assertRaises(TraceError):
+            evaluate([self.grant()],{"security_admin":"read"})
+
+    def test_non_string_event_type_is_rejected(self):
+        with self.assertRaises(TraceError):
+            evaluate([ev(1,17)])
+
     def test_unknown_event_rejected(self):
         with self.assertRaises(TraceError): evaluate([ev(1,"mystery")])
     def test_nonmonotonic_order_rejected(self):
