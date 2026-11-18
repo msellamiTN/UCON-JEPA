@@ -62,7 +62,7 @@ def make_episode(seed:int, episode_id:int, scenario:str|None=None)->dict:
             _event(t+1,"assume_admin",grant_id="target",principal="alice",scope="admin",tenant="tenant-a")])
     elif scenario=="revoked_grant":
         events.extend([_base_grant(t,"target","alice","admin",t+20),
-            _event(t+1,"revoke",grant_id="target"),
+            _event(t+1,"revoke",grant_id="target",actor="security_admin"),
             _event(t+2,"assume_admin",grant_id="target",principal="alice",scope="admin",tenant="tenant-a")])
     elif scenario=="expired_grant":
         events.extend([_base_grant(t,"target","alice","read",t+1),
@@ -71,14 +71,14 @@ def make_episode(seed:int, episode_id:int, scenario:str|None=None)->dict:
         motif_like=False
     elif scenario=="stale_policy_read":
         events.extend([_base_grant(t,"target","alice","read",t+20),
-            _event(t+1,"policy_update",version=2),
+            _event(t+1,"policy_update",actor="security_admin",version=2),
             _event(t+2,"read",grant_id="target",principal="alice",scope="read",tenant="tenant-a",
                 resource_id="sensitive-1",classification=1,clearance=2)])
         motif_like=False
     elif scenario=="stale_delegation":
         events.extend([_base_grant(t,"target","alice","read",t+20),
             _event(t+1,"policy_update",version=2),
-            _event(t+2,"delegate",source_grant_id="target",grant_id="child",principal="bob",
+            _event(t+2,"delegate",source_grant_id="target",actor="alice",grant_id="child",principal="bob",
                 scopes=["read"],expires_at=t+10)])
         motif_like=False
     elif scenario=="export_subject_substitution":
