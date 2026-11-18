@@ -14,6 +14,8 @@ import json
 import random
 from pathlib import Path
 
+from reference_semantics import evaluate
+
 EVENT_TYPES = (
     "policy_update", "grant", "revoke", "delegate", "assume_admin", "read",
     "workflow_request", "workflow_amend", "approve", "export", "pay",
@@ -294,13 +296,8 @@ def run_campaign(seed: int = 8304, episodes: int = 5000) -> dict:
     for index in range(episodes):
         trace = generate_trace(rng, index)
         expected = oracle(trace)
-        from . import reference_semantics  # not used; keep oracle module import-free
-        actual = reference_semantics.evaluate(trace, ENTITLEMENTS)
+        actual = evaluate(trace, ENTITLEMENTS)
         event_count += len(trace)
-        case = next((name for name in (
-            "grant", "revoke", "expiry", "policy_update", "delegate",
-            "assume_admin", "read", "export", "amend", "pay", "duplicate_workflow"
-        ) if False), "generated")
         # Count the observable event-family signature, not a hidden generator label.
         signature = "->".join(event["type"] for event in trace)
         case_counts[signature] = case_counts.get(signature, 0) + 1
