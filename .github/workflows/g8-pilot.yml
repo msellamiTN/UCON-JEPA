@@ -19,6 +19,8 @@ jobs:
         run: python -m unittest discover -s experiments/G8.2 -p "test_pilot_benchmark.py" -v
       - name: Smoke benchmark
         run: python experiments/G8.2/pilot_benchmark.py --seed 2026 --episodes-per-family 100 --out artifacts/g8.2-pilot
+      - name: Compositional benchmark smoke run
+        run: python experiments/G8.2/compositional_benchmark.py --seed 2026 --episodes-per-family 100 --out artifacts/g8.2-pilot
       - name: Upload pilot outputs
         uses: actions/upload-artifact@v4
         with:
