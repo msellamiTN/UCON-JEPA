@@ -1,8 +1,5 @@
 name: G8.2 Pilot Validation
 on:
-  push:
-    branches:
-      - research/g8.3.4-independent-temporal-oracle
   pull_request:
     paths:
       - "experiments/G8.2/**"
@@ -14,19 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-      - name: Merge proposed audit head onto current main
-        shell: bash
-        env:
-          PROPOSED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -euo pipefail
-          git fetch origin "$PROPOSED_HEAD"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git merge -X ours --no-edit FETCH_HEAD
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -46,13 +30,15 @@ jobs:
         run: python experiments/G8.2/contextual_benchmark.py --out artifacts/g8.2-pilot
       - name: Independent randomized policy-oracle differential audit
         run: python experiments/G8.2/independent_oracle_audit.py --seed 20261118 --cases-per-family 2000 --out artifacts/g8.2-pilot
-      - name: G8.3 temporal policy reference semantics
+      - name: G8.3 temporal policy reference semantics and randomized traces
         run: python -m unittest discover -s experiments/G8.3 -p "test_*.py" -v
-      - name: G8.3.4 independent temporal state-machine differential audit (5,000 episodes)
+      - name: G8.3.2 randomized temporal trace campaign
+        run: python experiments/G8.3/randomized_temporal_traces.py --seed 8302 --episodes 1200 --out artifacts/g8.3.2
+      - name: G8.3.4 independent temporal state-machine differential audit
         run: python experiments/G8.3/independent_temporal_oracle.py --seed 8304 --episodes 5000 --out artifacts/g8.2-pilot/g8.3.4
       - name: Upload pilot outputs
         uses: actions/upload-artifact@v4
         with:
           name: g8.2-pilot-results
-          path: artifacts/g8.2-pilot/
+          path: artifacts/
           if-no-files-found: error
