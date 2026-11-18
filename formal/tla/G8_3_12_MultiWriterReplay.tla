@@ -83,7 +83,7 @@ CrashBeforeCommit(w) ==
   /\ phase[w] \in {"LOCKED", "PREPARED"}
   /\ phase' = [phase EXCEPT ![w] = "ABORTED"]
   /\ lockOwner' = "NONE"
-  /\ stagedPair' = "NONE"
+  /\ stagedPair' = NoStage
   /\ UNCHANGED durablePairs
 
 RetryAfterAbort(w) ==
@@ -157,7 +157,7 @@ LockConsistency ==
   /\ (lockOwner \in Writers /\ phase[lockOwner] = "PREPARED" =>
        stagedPair = <<EventIdByWriter[lockOwner], EvaluationIdByWriter[lockOwner]>>)
   /\ (lockOwner \in Writers /\ phase[lockOwner] = "LOCKED" =>
-       stagedPair = "NONE")
+       stagedPair = NoStage)
 
 \* Negative control: bypass replay rejection and commit a second
 \* evaluation for an event ID that is already durable.
@@ -170,7 +170,7 @@ UnsafeDuplicateCommit(w) ==
        {<<EventIdByWriter[w], EvaluationIdByWriter[w]>>}
   /\ phase' = [phase EXCEPT ![w] = "COMMITTED"]
   /\ lockOwner' = "NONE"
-  /\ stagedPair' = "NONE"
+  /\ stagedPair' = NoStage
 
 NextUnsafe == Next \/ (\E w \in Writers : UnsafeDuplicateCommit(w))
 SpecUnsafe == Init /\ [][NextUnsafe]_vars
