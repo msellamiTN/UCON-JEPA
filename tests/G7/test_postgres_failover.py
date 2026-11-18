@@ -93,6 +93,12 @@ class PostgresWriterFenceTests(unittest.TestCase):
             payload=b"after", expected_writer_epoch=self.epoch,
         )
         self.assertEqual(result.outcome, "ACCEPTED")
+        with self.service._connect() as conn:
+            event = conn.execute(
+                "SELECT writer_epoch FROM ucon_events WHERE sequence=%s",
+                (result.event_sequence,),
+            ).fetchone()
+        self.assertEqual(event["writer_epoch"], self.epoch)
         recovered = self.service.lookup_invocation(invocation)
         self.assertIsNotNone(recovered)
         self.assertEqual(recovered.receipt_id, result.receipt_id)
