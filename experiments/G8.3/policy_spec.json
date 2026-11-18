@@ -1,0 +1,35 @@
+{
+  "specification": "G8.3 normative temporal policy model",
+  "version": "1.0.0",
+  "status": "research_reference_model_not_production_policy",
+  "time_model": "integer logical time; events are totally ordered by (time, sequence)",
+  "global_invariants": [
+    "A revoked grant cannot authorize an action after its revocation event.",
+    "A grant is valid only when event_time < expires_at.",
+    "An authorization decision must use the current policy version.",
+    "Delegated authority cannot exceed the delegator's scope or expiry.",
+    "An approval is valid only for the current workflow revision and policy version.",
+    "Requester, approver, and payer must be pairwise distinct for payment."
+  ],
+  "domains": {
+    "iam": {
+      "grant": "Only security_admin may create a grant; scope must be within the actor's grantable_scopes.",
+      "delegate": "Delegation requires an active source grant; delegated scope is a subset and expiry is no later than source expiry.",
+      "assume_admin": "Requires an active grant for the target principal, requested scope, and current policy version."
+    },
+    "data": {
+      "read": "Requires an active grant, clearance >= resource classification, and matching tenant.",
+      "export": "Requires a preceding authorized read, fresh approval for the current workflow revision and policy version, and recipient=owner."
+    },
+    "sod": {
+      "approve": "Requires a prior request; requester != approver; approval binds workflow revision and policy version.",
+      "pay": "Requires a current approval; requester, approver, and payer are pairwise distinct."
+    }
+  },
+  "event_contract": {
+    "required": ["time", "sequence", "type"],
+    "ordering": "strictly increasing lexicographic (time, sequence)",
+    "unknown_events": "rejected",
+    "malformed_events": "rejected"
+  }
+}
