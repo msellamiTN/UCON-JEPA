@@ -72,9 +72,12 @@ python -m unittest discover -s experiments/G8.2 -p "test_*.py" -v
 
 Run:
 ```bash
-python experiments/G8.2/mixed_b0_benchmark.py --seed 2026 --episodes-per-family 100 --out experiments/G8.2/output
+python experiments/G8.2/mixed_b0_benchmark.py --seed 2026 --episodes-per-family 100 --replicates 30 --out experiments/G8.2/output
 ```
 
 ### Initial mixed-cohort result (seed 2026)
 
 CI run #28 completed successfully. Each family had 20 test episodes (10 benign, 10 unsafe). B0 blocked all 30 unsafe episodes and intervened in none of the 30 benign episodes. Pooled Wilson 95% intervals: prevention recall 0.886–1.000; false-intervention rate 0.000–0.114. These small synthetic samples are not evidence of real-world security performance; the benign class is motif-free by construction and B0 uses the same motifs as the labels.
+
+
+CI now executes 30 independent seeds (3,000 generated episodes/family; 600 test episodes/family, balanced benign/unsafe) and retains aggregate plus replicate-level metrics in the artifact.
