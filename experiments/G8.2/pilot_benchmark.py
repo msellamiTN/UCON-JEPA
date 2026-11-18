@@ -39,12 +39,16 @@ def episode(seed: int, family: str, n: int = SEQUENCE_LEN):
     return trace
 
 def violation(family: str, seq: list[str]) -> bool:
+    """Label only ordered, contiguous unsafe motifs inside the prediction horizon."""
     if family == "iam":
-        return "grant_role" in seq and "assume_admin" in seq
-    if family == "data":
-        return "read_sensitive" in seq and "export_sensitive" in seq
-    # This synthetic rule is deliberately simplified: sequence presence is the label.
-    return all(x in seq for x in ("request", "approve", "pay"))
+        motif = ["grant_role", "assume_admin"]
+    elif family == "data":
+        motif = ["read_sensitive", "export_sensitive"]
+    else:
+        motif = ["request", "approve", "pay"]
+    width = len(motif)
+    return any(seq[i:i+width] == motif for i in range(len(seq)-width+1))
+
 
 def make_dataset(seed: int, episodes_per_family: int):
     rows = []
