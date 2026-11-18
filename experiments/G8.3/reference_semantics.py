@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""G8.3.1 temporal UCON reference semantics (research model, not production)."""
+"""G8.3 temporal UCON reference semantics with strict event-schema validation."""
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
@@ -21,6 +21,39 @@ def _require(e: dict, *keys: str) -> None:
     missing=[k for k in keys if k not in e]
     if missing: raise TraceError(f"missing required fields: {missing}")
 
+def _require_strings(e: dict, *keys: str) -> None:
+    for key in keys:
+        value=e[key]
+        if not isinstance(value,str) or not value.strip():
+            raise TraceError(f"{key} must be a non-empty string")
+
+def _require_integers(e: dict, *keys: str, minimum: int|None=None) -> None:
+    for key in keys:
+        value=e[key]
+        # bool is a subclass of int in Python; reject it explicitly.
+        if type(value) is not int or (minimum is not None and value<minimum):
+            suffix=f" >= {minimum}" if minimum is not None else ""
+            raise TraceError(f"{key} must be an integer{suffix}")
+
+def _require_string_list(e: dict, *keys: str) -> None:
+    for key in keys:
+        value=e[key]
+        if not isinstance(value,list) or not value or any(
+            not isinstance(item,str) or not item.strip() for item in value
+        ):
+            raise TraceError(f"{key} must be a non-empty list of non-empty strings")
+
+def _validate_entitlements(entitlements: dict) -> None:
+    if not isinstance(entitlements,dict):
+        raise TraceError("trusted_entitlements must be a mapping")
+    for actor, scopes in entitlements.items():
+        if not isinstance(actor,str) or not actor.strip():
+            raise TraceError("entitlement actor names must be non-empty strings")
+        if not isinstance(scopes,list) or any(
+            not isinstance(scope,str) or not scope.strip() for scope in scopes
+        ):
+            raise TraceError(f"entitlements for {actor!r} must be a list of non-empty strings")
+
 def _active(s: State, gid: str, t: int, principal: str, scope: str, tenant: str|None=None) -> bool:
     g=s.grants.get(gid)
     return bool(g and gid not in s.revoked and t < g["expires_at"]
@@ -34,7 +67,10 @@ def evaluate(events: list[dict], trusted_entitlements: dict[str, list[str]]|None
     trusted_entitlements is provisioned out-of-band by the experiment harness;
     no event may assert or extend an actor's own grantable scopes.
     """
-    entitlements=trusted_entitlements or {}
+    if not isinstance(events,list):
+        raise TraceError("events must be a list")
+    entitlements={} if trusted_entitlements is None else trusted_entitlements
+    _validate_entitlements(entitlements)
     s=State(); previous=(-1,-1)
     for e in events:
         if not isinstance(e,dict): raise TraceError("each event must be an object")
@@ -42,46 +78,72 @@ def evaluate(events: list[dict], trusted_entitlements: dict[str, list[str]]|None
         key=(e["time"],e["sequence"])
         if not all(type(x) is int and x>=0 for x in key) or key<=previous:
             raise TraceError("event order must be strictly increasing nonnegative (time, sequence)")
+        _require_strings(e,"type")
         previous=key; t,typ=e["time"],e["type"]
+        if typ not in EVENT_TYPES: raise TraceError(f"unknown event type: {typ}")
         d={"time":t,"sequence":e["sequence"],"event":typ,"allowed":True,"reason":None}
         if typ=="policy_update":
-            _require(e,"version")
-            if type(e["version"]) is not int or e["version"]<=s.policy_version: raise TraceError("policy version must increase")
-            s.policy_version=e["version"]
+            _require(e,"actor","version")
+            _require_strings(e,"actor")
+            _require_integers(e,"version",minimum=1)
+            if e["actor"]!="security_admin" or "admin" not in entitlements.get(e["actor"],[]):
+                d.update(allowed=False,reason="policy_update_requires_admin_entitlement")
+            elif e["version"]<=s.policy_version:
+                raise TraceError("policy version must increase")
+            else:
+                s.policy_version=e["version"]
         elif typ=="grant":
             _require(e,"grant_id","actor","principal","scopes","tenant","expires_at","policy_version")
+            _require_strings(e,"grant_id","actor","principal","tenant")
+            _require_string_list(e,"scopes")
+            _require_integers(e,"expires_at","policy_version",minimum=1)
             scopes=e["scopes"]
-            allowed=(e["actor"]=="security_admin" and isinstance(scopes,list) and bool(scopes)
+            allowed=(e["actor"]=="security_admin"
               and set(scopes).issubset(set(entitlements.get(e["actor"],[])))
               and type(e["expires_at"]) is int and e["expires_at"]>t
               and e["policy_version"]==s.policy_version and e["grant_id"] not in s.grants)
             if allowed:
-                s.grants[e["grant_id"]]={"principal":e["principal"],"scopes":list(scopes),"tenant":e["tenant"],
+                s.grants[e["grant_id"]]={"principal":e["principal"],"issuer":e["actor"],
+                  "scopes":list(scopes),"tenant":e["tenant"],
                   "expires_at":e["expires_at"],"policy_version":s.policy_version}
             else: d.update(allowed=False,reason="grant_not_authorized_or_invalid")
         elif typ=="revoke":
-            _require(e,"grant_id")
-            if e["grant_id"] not in s.grants: d.update(allowed=False,reason="unknown_grant")
-            else: s.revoked.add(e["grant_id"])
+            _require(e,"grant_id","actor")
+            _require_strings(e,"grant_id","actor")
+            grant=s.grants.get(e["grant_id"])
+            if grant is None:
+                d.update(allowed=False,reason="unknown_grant")
+            elif (e["actor"]==grant["issuer"] or
+                  (e["actor"]=="security_admin" and "admin" in entitlements.get(e["actor"],[]))):
+                s.revoked.add(e["grant_id"])
+            else:
+                d.update(allowed=False,reason="revoke_requires_grant_issuer_or_admin")
         elif typ=="delegate":
-            _require(e,"source_grant_id","grant_id","principal","scopes","expires_at")
+            _require(e,"source_grant_id","grant_id","actor","principal","scopes","expires_at")
+            _require_strings(e,"source_grant_id","grant_id","actor","principal")
+            _require_string_list(e,"scopes")
+            _require_integers(e,"expires_at",minimum=1)
             src=s.grants.get(e["source_grant_id"])
             allowed=bool(src and e["source_grant_id"] not in s.revoked
+              and e["actor"]==src["principal"]
               and t<src["expires_at"] and src["policy_version"]==s.policy_version
-              and isinstance(e["scopes"],list) and bool(e["scopes"])
               and set(e["scopes"]).issubset(set(src["scopes"]))
               and type(e["expires_at"]) is int and t<e["expires_at"]<=src["expires_at"]
               and e["grant_id"] not in s.grants)
             if allowed:
-                s.grants[e["grant_id"]]={"principal":e["principal"],"scopes":list(e["scopes"]),
-                  "tenant":src["tenant"],"expires_at":e["expires_at"],"policy_version":s.policy_version}
+                s.grants[e["grant_id"]]={"principal":e["principal"],"issuer":e["actor"],
+                  "scopes":list(e["scopes"]),"tenant":src["tenant"],
+                  "expires_at":e["expires_at"],"policy_version":s.policy_version}
             else: d.update(allowed=False,reason="delegation_exceeds_or_lacks_current_authority")
         elif typ=="assume_admin":
             _require(e,"grant_id","principal","scope","tenant")
+            _require_strings(e,"grant_id","principal","scope","tenant")
             if not _active(s,e["grant_id"],t,e["principal"],e["scope"],e["tenant"]):
                 d.update(allowed=False,reason="no_active_current_admin_grant")
         elif typ=="read":
             _require(e,"grant_id","principal","scope","tenant","resource_id","classification","clearance")
+            _require_strings(e,"grant_id","principal","scope","tenant","resource_id")
+            _require_integers(e,"classification","clearance",minimum=0)
             ok=(_active(s,e["grant_id"],t,e["principal"],e["scope"],e["tenant"])
                 and type(e["classification"]) is int and type(e["clearance"]) is int
                 and e["clearance"]>=e["classification"])
@@ -89,16 +151,22 @@ def evaluate(events: list[dict], trusted_entitlements: dict[str, list[str]]|None
             else: d.update(allowed=False,reason="read_not_authorized")
         elif typ=="workflow_request":
             _require(e,"workflow_id","requester","revision")
+            _require_strings(e,"workflow_id","requester")
+            _require_integers(e,"revision",minimum=1)
             if e["workflow_id"] in s.workflows: d.update(allowed=False,reason="workflow_already_exists")
             else: s.workflows[e["workflow_id"]]={"requester":e["requester"],"revision":e["revision"],"approval":None}
         elif typ=="workflow_amend":
             _require(e,"workflow_id","revision")
+            _require_strings(e,"workflow_id")
+            _require_integers(e,"revision",minimum=1)
             w=s.workflows.get(e["workflow_id"])
-            if not w or type(e["revision"]) is not int or e["revision"]<=w["revision"]:
+            if not w or e["revision"]<=w["revision"]:
                 d.update(allowed=False,reason="invalid_workflow_revision")
             else: w["revision"]=e["revision"]; w["approval"]=None
         elif typ=="approve":
             _require(e,"workflow_id","approver","revision","policy_version","action","principal","resource_id","recipient")
+            _require_strings(e,"workflow_id","approver","action","principal","resource_id","recipient")
+            _require_integers(e,"revision","policy_version",minimum=1)
             w=s.workflows.get(e["workflow_id"])
             ok=bool(w and e["revision"]==w["revision"] and e["approver"]!=w["requester"]
               and e["policy_version"]==s.policy_version)
@@ -107,6 +175,8 @@ def evaluate(events: list[dict], trusted_entitlements: dict[str, list[str]]|None
             else: d.update(allowed=False,reason="approval_not_fresh_or_sod_violation")
         elif typ=="export":
             _require(e,"workflow_id","principal","resource_id","recipient","workflow_revision","policy_version")
+            _require_strings(e,"workflow_id","principal","resource_id","recipient")
+            _require_integers(e,"workflow_revision","policy_version",minimum=1)
             w=s.workflows.get(e["workflow_id"]); a=w.get("approval") if w else None
             ok=bool(a and (e["principal"],e["resource_id"]) in s.reads and e["recipient"]=="owner"
               and a["action"]=="export" and a["principal"]==e["principal"]
@@ -116,6 +186,8 @@ def evaluate(events: list[dict], trusted_entitlements: dict[str, list[str]]|None
             if not ok: d.update(allowed=False,reason="export_lacks_subject_bound_current_approval_or_read")
         elif typ=="pay":
             _require(e,"workflow_id","payer","revision")
+            _require_strings(e,"workflow_id","payer")
+            _require_integers(e,"revision",minimum=1)
             w=s.workflows.get(e["workflow_id"]); a=w.get("approval") if w else None
             ok=bool(w and a and a["action"]=="pay" and e["revision"]==w["revision"]==a["revision"]
               and a["policy_version"]==s.policy_version

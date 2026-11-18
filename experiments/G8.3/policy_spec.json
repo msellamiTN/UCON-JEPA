@@ -1,26 +1,187 @@
 {
-  "specification":"G8.3.1 temporal policy model",
-  "version":"1.1.0",
-  "status":"research_reference_model_not_production_policy",
-  "time_model":"integer logical time; strictly increasing lexicographic (time, sequence)",
-  "trusted_state":{"actor_entitlements":"Supplied out-of-band to evaluator; never accepted from an event payload."},
-  "event_types":["policy_update","grant","revoke","delegate","assume_admin","read","workflow_request","workflow_amend","approve","export","pay"],
-  "rules":{
-    "grant":"Only security_admin may grant scopes in trusted_entitlements[actor]; expiry is exclusive and policy version must be current.",
-    "delegate":"Source grant must be unrevoked, unexpired and current-version; delegated scopes are a nonempty subset; expiry is within source expiry.",
-    "assume_admin":"Requires an active current-version grant for the specified principal, scope and tenant.",
-    "read":"Requires active grant, matching tenant, and clearance >= classification.",
-    "approve":"Approval binds workflow_id, revision, policy_version, action, principal, resource_id and recipient; requester and approver differ.",
-    "export":"Requires a prior authorized read and exact match to a current workflow approval for principal, resource, recipient, revision and policy version; recipient must be owner.",
-    "pay":"Requires a current pay approval and pairwise-distinct requester, approver and payer."
+  "specification": "G8.3 temporal policy model",
+  "version": "1.2.0",
+  "status": "research_reference_model_not_production_policy",
+  "time_model": "integer logical time; strictly increasing lexicographic (time, sequence)",
+  "trusted_state": {
+    "actor_entitlements": "Supplied out-of-band to evaluator; never accepted from an event payload."
   },
-  "global_invariants":[
+  "event_types": [
+    "policy_update",
+    "grant",
+    "revoke",
+    "delegate",
+    "assume_admin",
+    "read",
+    "workflow_request",
+    "workflow_amend",
+    "approve",
+    "export",
+    "pay"
+  ],
+  "rules": {
+    "grant": "Only security_admin may grant scopes in trusted_entitlements[actor]; expiry is exclusive and policy version must be current.",
+    "delegate": "Delegation requires the event actor to equal the principal of the active source grant; delegated scopes are a nonempty subset and expiry is within source expiry.",
+    "assume_admin": "Requires an active current-version grant for the specified principal, scope and tenant.",
+    "read": "Requires active grant, matching tenant, and clearance >= classification.",
+    "approve": "Approval binds workflow_id, revision, policy_version, action, principal, resource_id and recipient; requester and approver differ.",
+    "export": "Requires a prior authorized read and exact match to a current workflow approval for principal, resource, recipient, revision and policy version; recipient must be owner.",
+    "pay": "Requires a current pay approval and pairwise-distinct requester, approver and payer.",
+    "policy_update": "Only security_admin with the trusted admin entitlement may update policy; version must strictly increase. Unauthorized update events are denied and do not change current version.",
+    "revoke": "A grant may be revoked by its recorded issuer, or by security_admin with the trusted admin entitlement. Unauthorized revoke events are denied and do not alter grant state."
+  },
+  "global_invariants": [
     "Revoked grants never authorize subsequent actions.",
     "A grant is valid iff event_time < expires_at.",
     "All authorization decisions use the current policy version.",
     "Delegated authority never exceeds active source authority.",
     "Approval is bound to one workflow revision and action subject.",
-    "Requester, approver and payer are pairwise distinct for payment."
+    "Requester, approver and payer are pairwise distinct for payment.",
+    "Only the source-grant principal may delegate that grant.",
+    "Only the grant issuer or an entitled security administrator may revoke a grant.",
+    "Only an entitled security administrator may change the policy version."
   ],
-  "event_contract":{"required":["time","sequence","type"],"unknown_events":"rejected","malformed_events":"rejected"}
+  "event_contract": {
+    "required": [
+      "time",
+      "sequence",
+      "type"
+    ],
+    "unknown_events": "rejected",
+    "malformed_events": "rejected",
+    "field_types": {
+      "time": "nonnegative integer (bool rejected)",
+      "sequence": "nonnegative integer (bool rejected)",
+      "type": "non-empty string in event_types",
+      "version": "positive integer for policy_update",
+      "grant_id": "non-empty string",
+      "source_grant_id": "non-empty string",
+      "actor": "non-empty string",
+      "principal": "non-empty string",
+      "scopes": "non-empty list of non-empty strings",
+      "tenant": "non-empty string",
+      "expires_at": "positive integer",
+      "policy_version": "positive integer",
+      "scope": "non-empty string",
+      "resource_id": "non-empty string",
+      "classification": "nonnegative integer",
+      "clearance": "nonnegative integer",
+      "workflow_id": "non-empty string",
+      "requester": "non-empty string",
+      "revision": "positive integer",
+      "approver": "non-empty string",
+      "action": "non-empty string",
+      "recipient": "non-empty string",
+      "workflow_revision": "positive integer",
+      "payer": "non-empty string"
+    },
+    "trusted_entitlements": "Optional mapping from non-empty actor strings to lists of non-empty scope strings; supplied out-of-band.",
+    "required_by_event": {
+      "policy_update": [
+        "time",
+        "sequence",
+        "type",
+        "actor",
+        "version"
+      ],
+      "grant": [
+        "time",
+        "sequence",
+        "type",
+        "grant_id",
+        "actor",
+        "principal",
+        "scopes",
+        "tenant",
+        "expires_at",
+        "policy_version"
+      ],
+      "revoke": [
+        "time",
+        "sequence",
+        "type",
+        "grant_id",
+        "actor"
+      ],
+      "delegate": [
+        "time",
+        "sequence",
+        "type",
+        "source_grant_id",
+        "grant_id",
+        "actor",
+        "principal",
+        "scopes",
+        "expires_at"
+      ],
+      "assume_admin": [
+        "time",
+        "sequence",
+        "type",
+        "grant_id",
+        "principal",
+        "scope",
+        "tenant"
+      ],
+      "read": [
+        "time",
+        "sequence",
+        "type",
+        "grant_id",
+        "principal",
+        "scope",
+        "tenant",
+        "resource_id",
+        "classification",
+        "clearance"
+      ],
+      "workflow_request": [
+        "time",
+        "sequence",
+        "type",
+        "workflow_id",
+        "requester",
+        "revision"
+      ],
+      "workflow_amend": [
+        "time",
+        "sequence",
+        "type",
+        "workflow_id",
+        "revision"
+      ],
+      "approve": [
+        "time",
+        "sequence",
+        "type",
+        "workflow_id",
+        "approver",
+        "revision",
+        "policy_version",
+        "action",
+        "principal",
+        "resource_id",
+        "recipient"
+      ],
+      "export": [
+        "time",
+        "sequence",
+        "type",
+        "workflow_id",
+        "principal",
+        "resource_id",
+        "recipient",
+        "workflow_revision",
+        "policy_version"
+      ],
+      "pay": [
+        "time",
+        "sequence",
+        "type",
+        "workflow_id",
+        "payer",
+        "revision"
+      ]
+    }
+  }
 }
