@@ -67,6 +67,8 @@ def evaluate(events: list[dict], trusted_entitlements: dict[str, list[str]]|None
     trusted_entitlements is provisioned out-of-band by the experiment harness;
     no event may assert or extend an actor's own grantable scopes.
     """
+    if not isinstance(events,list):
+        raise TraceError("events must be a list")
     entitlements={} if trusted_entitlements is None else trusted_entitlements
     _validate_entitlements(entitlements)
     s=State(); previous=(-1,-1)
