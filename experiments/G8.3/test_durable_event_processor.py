@@ -261,5 +261,28 @@ class TransactionalReplayLedgerTests(unittest.TestCase):
         )
 
 
+    def test_precommit_process_crash_releases_lock_for_racing_retries(self):
+        envelope = self.signed(self.workflow_event("crash-contention-before"),
+                               "crash-contention-before-e1")
+        self.crash_child("before_commit", envelope)
+        outcomes = self.run_process_race([envelope] * 4)
+        self.assertEqual(sum(item["committed"] for item in outcomes), 1)
+        self.assertEqual(sum(not item["committed"] for item in outcomes), 3)
+        self.assertEqual(self.processor.counts(), {"processed_events": 1, "evaluations": 1})
+        self.assertEqual(self.assert_database_healthy(),
+                         (["crash-contention-before-e1"], 1))
+
+    def test_postcommit_lost_ack_process_crash_rejects_all_racing_retries(self):
+        envelope = self.signed(self.workflow_event("crash-contention-after"),
+                               "crash-contention-after-e1")
+        self.crash_child("after_commit", envelope)
+        outcomes = self.run_process_race([envelope] * 4)
+        self.assertEqual(sum(item["committed"] for item in outcomes), 0)
+        self.assertEqual(sum(not item["committed"] for item in outcomes), 4)
+        self.assertEqual(self.processor.counts(), {"processed_events": 1, "evaluations": 1})
+        self.assertEqual(self.assert_database_healthy(),
+                         (["crash-contention-after-e1"], 1))
+
+
 if __name__ == "__main__":
     unittest.main()
