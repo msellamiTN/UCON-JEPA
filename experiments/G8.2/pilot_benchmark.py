@@ -27,11 +27,11 @@ def episode(seed: int, family: str, n: int = SEQUENCE_LEN):
     unsafe = rng.random() < 0.35
     if unsafe:
         if family == "iam":
-            trace[rng.randrange(n)] = "grant_role"
-            trace[rng.randrange(n)] = "assume_admin"
+            i = rng.randrange(n - 1)
+            trace[i:i+2] = ["grant_role", "assume_admin"]
         elif family == "data":
-            trace[rng.randrange(n)] = "read_sensitive"
-            trace[rng.randrange(n)] = "export_sensitive"
+            i = rng.randrange(n - 1)
+            trace[i:i+2] = ["read_sensitive", "export_sensitive"]
         else:
             # request -> approve -> pay, with no independent approver
             i = rng.randrange(n - 2)
