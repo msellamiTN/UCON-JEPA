@@ -122,6 +122,46 @@ jobs:
           fi
           echo "G8.3.11 atomicity mutant: expected invariant violation detected."
 
+      - name: Parse G8.3.12 multi-writer replay model
+        shell: bash
+        run: |
+          set -o pipefail
+          java -cp .tools/tla2tools.jar tla2sany.SANY formal/tla/G8_3_12_MultiWriterReplay.tla \
+            2>&1 | tee artifacts/g8-3-12-sany.log
+
+      - name: Check duplicate and distinct multi-writer scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          for scenario in duplicate distinct; do
+            log="artifacts/g8-3-12-$scenario-tlc.log"
+            java -XX:+UseParallelGC -Xmx3g -jar .tools/tla2tools.jar \
+              -config "formal/tla/G8_3_12_MultiWriterReplay_$scenario.cfg" \
+              -workers 1 \
+              formal/tla/G8_3_12_MultiWriterReplay.tla 2>&1 | tee "$log"
+            grep -q "Model checking completed. No error has been found." "$log"
+          done
+
+      - name: Verify G8.3.12 replay-bypass mutant is detected
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="artifacts/g8-3-12-replay-bypass-mutant.log"
+          if java -XX:+UseParallelGC -Xmx3g -jar .tools/tla2tools.jar \
+            -config formal/tla/G8_3_12_MultiWriterReplay_mutant.cfg \
+            -workers 1 \
+            formal/tla/G8_3_12_MultiWriterReplay.tla >"$log" 2>&1; then
+            echo "ERROR: G8.3.12 replay-bypass mutant unexpectedly passed."
+            cat "$log"
+            exit 1
+          fi
+          if ! grep -q "NoDuplicateEventCommit" "$log"; then
+            echo "ERROR: G8.3.12 mutant failed for an unexpected reason."
+            cat "$log"
+            exit 1
+          fi
+          echo "G8.3.12 replay-bypass mutant: expected duplicate-commit invariant violation detected."
+
       - name: Upload model-checking logs
         if: always()
         uses: actions/upload-artifact@v4
