@@ -81,6 +81,10 @@ RetryCommittedEvent ==
   /\ UNCHANGED <<durableEvents, durableEvaluations,
        stagedEvents, stagedEvaluations, acknowledged, commitCount>>
 
+Terminal ==
+  /\ phase \in {"ACKNOWLEDGED", "REPLAY_REJECTED"}
+  /\ UNCHANGED vars
+
 Next ==
   \/ Begin
   \/ Prepare
@@ -90,6 +94,7 @@ Next ==
   \/ CrashAfterCommitBeforeAck
   \/ RetryAfterAbort
   \/ RetryCommittedEvent
+  \/ Terminal
 
 Spec == Init /\ [][Next]_vars
 
