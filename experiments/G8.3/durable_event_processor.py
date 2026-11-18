@@ -42,6 +42,14 @@ class SQLiteEventProcessor:
                 );
             """)
 
+    def _before_commit(self, connection: sqlite3.Connection) -> None:
+        """Internal fault-injection seam; called after writes, before COMMIT."""
+        return None
+
+    def _after_commit(self, connection: sqlite3.Connection) -> None:
+        """Internal fault-injection seam; called after COMMIT, before acknowledgement."""
+        return None
+
     def process(
         self,
         signed_events: Sequence[Mapping[str, Any]],
@@ -77,7 +85,9 @@ class SQLiteEventProcessor:
                 "INSERT INTO evaluations (evaluation_id, result_json, accepted_at) VALUES (?, ?, ?)",
                 (evaluation_id, json.dumps(result, sort_keys=True), accepted_at),
             )
+            self._before_commit(connection)
             connection.execute("COMMIT")
+            self._after_commit(connection)
             return {"evaluation_id": evaluation_id, **result, "committed": True}
         except Exception as exc:
             if connection.in_transaction:
