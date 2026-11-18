@@ -1,0 +1,28 @@
+name: G7 PostgreSQL HA lab validation
+
+on:
+  push:
+    branches: [research/g7-conditional-api-adapter]
+    paths:
+      - "experiments/G7/ha/**"
+      - ".github/workflows/g7-ha-lab.yml"
+  pull_request:
+    paths:
+      - "experiments/G7/ha/**"
+      - ".github/workflows/g7-ha-lab.yml"
+  workflow_dispatch:
+
+jobs:
+  compose-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare local-only environment file
+        working-directory: experiments/G7/ha
+        run: cp .env.example .env
+      - name: Validate Compose model
+        working-directory: experiments/G7/ha
+        run: docker compose -f compose.yaml config --quiet
+      - name: Build Patroni PostgreSQL image
+        working-directory: experiments/G7/ha
+        run: docker compose -f compose.yaml build pg1
