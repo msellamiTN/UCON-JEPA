@@ -1,6 +1,6 @@
 # G7.8 PostgreSQL HA lab (Patroni + etcd)
 
-**Status: Compose model and Patroni image build passed CI. The first live smoke-test attempt exposed missing replication HBA rules and a mounted data-directory layout issue; both were corrected, and the rerun is pending. No runtime HA acceptance is claimed yet.**
+**Status: Compose model and Patroni image build passed CI. Runtime smoke tests have not passed. Run #13 exposed a Patroni YAML parse failure: unquoted `%(ENV_VAR)s` interpolation tokens are invalid YAML scalars. The current correction quotes every interpolation token, installs explicit bootstrap HBA rules, and places `data_dir` below the mounted volume root. The corrected commit still requires a fresh runtime smoke run. No runtime HA acceptance is claimed.**
 
 This lab is intentionally separate from the single-primary PostgreSQL CI service. It provisions three PostgreSQL/Patroni nodes, a three-member etcd quorum, and HAProxy routing to the Patroni primary.
 
