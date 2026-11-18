@@ -33,7 +33,32 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: detect-latex-inputs
+        name: Detect changes to LaTeX source inputs
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            base="$PR_BASE_SHA"
+          else
+            base="$PUSH_BEFORE"
+          fi
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            changed=true
+          elif git diff --name-only "$base" "$GITHUB_SHA" | grep -q '^paper/formal/'; then
+            changed=true
+          else
+            changed=false
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "LaTeX inputs changed: $changed"
       - name: Install minimal TeX Live toolchain
+        if: steps.detect-latex-inputs.outputs.changed == 'true'
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -46,6 +71,7 @@ jobs:
             texlive-latex-extra \
             lmodern
       - name: Build and verify all LaTeX dossiers
+        if: steps.detect-latex-inputs.outputs.changed == 'true'
         working-directory: paper/formal
         shell: bash
         run: |
@@ -66,3 +92,6 @@ jobs:
             test -s "$pdf"
             file "$pdf"
           done
+      - name: Skip LaTeX build when inputs are unchanged
+        if: steps.detect-latex-inputs.outputs.changed != 'true'
+        run: echo "No files under paper/formal changed; the last successful PDF build remains applicable."
