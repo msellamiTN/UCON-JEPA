@@ -87,6 +87,16 @@ class TemporalPolicyTests(unittest.TestCase):
         with self.assertRaises(TraceError):
             evaluate([ev(1,17)])
 
+    def test_non_list_event_container_is_rejected(self):
+        for malformed in (None, {}, "not-a-trace", 17):
+            with self.subTest(malformed=malformed):
+                with self.assertRaises(TraceError):
+                    evaluate(malformed, ENT)
+
+    def test_non_object_event_is_rejected(self):
+        with self.assertRaises(TraceError):
+            evaluate([None], ENT)
+
     def test_unknown_event_rejected(self):
         with self.assertRaises(TraceError): evaluate([ev(1,"mystery")])
     def test_nonmonotonic_order_rejected(self):
