@@ -23,6 +23,11 @@ from .transactional_service import IdempotencyConflict, MutationResult
 class PostgresConfig:
     dsn: str
     connect_timeout: int = 5
+    require_writer_epoch: bool = False
+
+
+class StaleWriterEpoch(RuntimeError):
+    """The caller's fencing token is not current on this database primary."""
 
 
 class PostgresUconService:
@@ -47,10 +52,13 @@ class PostgresUconService:
         CREATE TABLE IF NOT EXISTS ucon_control_state (
             singleton SMALLINT PRIMARY KEY CHECK (singleton = 1),
             policy_version BIGINT NOT NULL CHECK (policy_version >= 0),
-            authorization_epoch BIGINT NOT NULL CHECK (authorization_epoch >= 0)
+            authorization_epoch BIGINT NOT NULL CHECK (authorization_epoch >= 0),
+            writer_epoch BIGINT NOT NULL DEFAULT 1 CHECK (writer_epoch >= 1)
         );
-        INSERT INTO ucon_control_state VALUES (1, 1, 1)
-            ON CONFLICT (singleton) DO NOTHING;
+        ALTER TABLE ucon_control_state ADD COLUMN IF NOT EXISTS
+            writer_epoch BIGINT NOT NULL DEFAULT 1 CHECK (writer_epoch >= 1);
+        INSERT INTO ucon_control_state(singleton,policy_version,authorization_epoch,writer_epoch)
+            VALUES (1, 1, 1, 1) ON CONFLICT (singleton) DO NOTHING;
         CREATE TABLE IF NOT EXISTS ucon_resources (
             resource_id TEXT PRIMARY KEY,
             version BIGINT NOT NULL CHECK (version >= 0),
@@ -97,30 +105,71 @@ class PostgresUconService:
                     conn.execute(statement)
 
     @staticmethod
-    def _lock_control(cur):
+    def _lock_control(self, cur, expected_writer_epoch=None):
         row = cur.execute(
-            "SELECT policy_version, authorization_epoch FROM ucon_control_state "
-            "WHERE singleton=1 FOR UPDATE"
+            "SELECT policy_version, authorization_epoch, writer_epoch "
+            "FROM ucon_control_state WHERE singleton=1 FOR UPDATE"
         ).fetchone()
         if row is None:
             raise RuntimeError("ucon_control_state is not initialized")
+        if self.config.require_writer_epoch and expected_writer_epoch is None:
+            raise StaleWriterEpoch("writer fencing token is required")
+        if expected_writer_epoch is not None and expected_writer_epoch != row["writer_epoch"]:
+            raise StaleWriterEpoch(
+                f"stale writer epoch {expected_writer_epoch}; current epoch is {row['writer_epoch']}"
+            )
         return row
 
-    def create_resource(self, resource_id: str, payload: bytes = b"{}") -> None:
+    def advance_writer_epoch(self, *, expected_current_epoch: int,
+                             new_writer_epoch: int) -> int:
+        """Install a monotonic fencing epoch on the currently authoritative DB.
+
+        This operation does not fence an isolated old primary by itself. The
+        failover controller must externally prevent the old primary accepting
+        writes before advancing the epoch on the promoted primary.
+        """
+        if new_writer_epoch <= expected_current_epoch:
+            raise ValueError("new writer epoch must be strictly greater")
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                state = self._lock_control(cur, expected_current_epoch)
+                updated = cur.execute(
+                    "UPDATE ucon_control_state SET writer_epoch=%s WHERE singleton=1 "
+                    "AND writer_epoch=%s RETURNING writer_epoch",
+                    (new_writer_epoch, expected_current_epoch),
+                ).fetchone()
+                if updated is None:
+                    raise StaleWriterEpoch("writer epoch changed during promotion")
+                return updated["writer_epoch"]
+
+    def current_writer_epoch(self) -> int:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT writer_epoch FROM ucon_control_state WHERE singleton=1"
+            ).fetchone()
+            if row is None:
+                raise RuntimeError("ucon_control_state is not initialized")
+            return row["writer_epoch"]
+
+    def create_resource(self, resource_id: str, payload: bytes = b"{}",
+                        *, expected_writer_epoch: int | None = None) -> None:
         if not resource_id:
             raise ValueError("resource_id is required")
         with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO ucon_resources(resource_id,version,payload) VALUES(%s,0,%s)",
-                (resource_id, payload),
-            )
+            with conn.cursor() as cur:
+                self._lock_control(cur, expected_writer_epoch)
+                cur.execute(
+                    "INSERT INTO ucon_resources(resource_id,version,payload) VALUES(%s,0,%s)",
+                    (resource_id, payload),
+                )
 
-    def grant(self, principal: str, action: str, resource_id: str) -> tuple[int, int]:
+    def grant(self, principal: str, action: str, resource_id: str, *,
+              expected_writer_epoch: int | None = None) -> tuple[int, int]:
         if not all((principal, action, resource_id)):
             raise ValueError("grant binding fields are required")
         with self._connect() as conn:
             with conn.cursor() as cur:
-                self._lock_control(cur)
+                self._lock_control(cur, expected_writer_epoch)
                 cur.execute(
                     "INSERT INTO ucon_grants VALUES(%s,%s,%s) "
                     "ON CONFLICT(principal,action,resource_id) DO NOTHING",
@@ -133,12 +182,13 @@ class PostgresUconService:
                 ).fetchone()
                 return state["policy_version"], state["authorization_epoch"]
 
-    def revoke(self, principal: str) -> tuple[int, int, int]:
+    def revoke(self, principal: str, *,
+               expected_writer_epoch: int | None = None) -> tuple[int, int, int]:
         if not principal:
             raise ValueError("principal is required")
         with self._connect() as conn:
             with conn.cursor() as cur:
-                self._lock_control(cur)
+                self._lock_control(cur, expected_writer_epoch)
                 cur.execute(
                     "INSERT INTO ucon_revoked VALUES(%s) ON CONFLICT(principal) DO NOTHING",
                     (principal,),
@@ -155,10 +205,11 @@ class PostgresUconService:
                 ).fetchone()["sequence"]
                 return state["policy_version"], state["authorization_epoch"], seq
 
-    def update_policy(self) -> tuple[int, int]:
+    def update_policy(self, *,
+                      expected_writer_epoch: int | None = None) -> tuple[int, int]:
         with self._connect() as conn:
             with conn.cursor() as cur:
-                self._lock_control(cur)
+                self._lock_control(cur, expected_writer_epoch)
                 state = cur.execute(
                     "UPDATE ucon_control_state SET policy_version=policy_version+1, "
                     "authorization_epoch=authorization_epoch+1 WHERE singleton=1 "
@@ -169,7 +220,7 @@ class PostgresUconService:
     def snapshot(self, resource_id: str) -> dict:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT r.version,r.payload,c.policy_version,c.authorization_epoch "
+                "SELECT r.version,r.payload,c.policy_version,c.authorization_epoch,c.writer_epoch "
                 "FROM ucon_resources r CROSS JOIN ucon_control_state c "
                 "WHERE r.resource_id=%s AND c.singleton=1",
                 (resource_id,),
@@ -180,6 +231,7 @@ class PostgresUconService:
                 "resource_version": row["version"], "payload": bytes(row["payload"]),
                 "policy_version": row["policy_version"],
                 "authorization_epoch": row["authorization_epoch"],
+                "writer_epoch": row["writer_epoch"],
             }
 
     def mutate(
@@ -203,7 +255,7 @@ class PostgresUconService:
 
         with self._connect() as conn:
             with conn.cursor() as cur:
-                state = self._lock_control(cur)
+                state = self._lock_control(cur, expected_writer_epoch)
                 prior = cur.execute(
                     "SELECT * FROM ucon_invocations WHERE invocation_id=%s",
                     (invocation_id,),
