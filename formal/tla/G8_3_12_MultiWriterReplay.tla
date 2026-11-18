@@ -17,6 +17,8 @@ EvaluationIdByWriter ==
 
 EventIds == {EventIdByWriter[w] : w \in Writers}
 EvaluationIds == {EvaluationIdByWriter[w] : w \in Writers}
+NoStage == <<"NONE", "NONE">>
+
 Phases == {"READY", "LOCKED", "PREPARED", "COMMITTED",
            "ACKNOWLEDGED", "ABORTED", "RECOVERED_COMMIT",
            "REPLAY_REJECTED"}
@@ -29,7 +31,7 @@ Init ==
   /\ phase = [w \in Writers |-> "READY"]
   /\ lockOwner = "NONE"
   /\ durablePairs = {}
-  /\ stagedPair = "NONE"
+  /\ stagedPair = NoStage
 
 Acquire(w) ==
   /\ w \in Writers
@@ -66,7 +68,7 @@ Commit(w) ==
   /\ durablePairs' = durablePairs \cup {stagedPair}
   /\ phase' = [phase EXCEPT ![w] = "COMMITTED"]
   /\ lockOwner' = "NONE"
-  /\ stagedPair' = "NONE"
+  /\ stagedPair' = NoStage
 
 Acknowledge(w) ==
   /\ w \in Writers
@@ -128,7 +130,7 @@ TypeOK ==
   /\ phase \in [Writers -> Phases]
   /\ lockOwner \in Writers \cup {"NONE"}
   /\ durablePairs \subseteq (EventIds \X EvaluationIds)
-  /\ stagedPair \in {"NONE"} \cup (EventIds \X EvaluationIds)
+  /\ stagedPair \in {NoStage} \cup (EventIds \X EvaluationIds)
 
 NoDuplicateEventCommit ==
   \A p1, p2 \in durablePairs : p1[1] = p2[1] => p1 = p2
@@ -149,7 +151,7 @@ ReplayRejectionRequiresPriorCommit ==
       EventIdByWriter[w] \in DurableEvents
 
 LockConsistency ==
-  /\ (lockOwner = "NONE" => stagedPair = "NONE")
+  /\ (lockOwner = "NONE" => stagedPair = NoStage)
   /\ (lockOwner \in Writers =>
        phase[lockOwner] \in {"LOCKED", "PREPARED"})
   /\ (lockOwner \in Writers /\ phase[lockOwner] = "PREPARED" =>
