@@ -20,7 +20,7 @@ class TemporalPolicyTests(unittest.TestCase):
     def test_policy_update_invalidates_read(self):
         self.assertFalse(evaluate([self.grant(),ev(2,"policy_update",actor="security_admin",version=2),self.read(3)],ENT)["decisions"][-1]["allowed"])
     def test_stale_grant_cannot_delegate_after_policy_update(self):
-        events=[self.grant(),ev(2,"policy_update",version=2),ev(3,"delegate",source_grant_id="g1",actor="alice",
+        events=[self.grant(),ev(2,"policy_update",actor="security_admin",version=2),ev(3,"delegate",source_grant_id="g1",actor="alice",
           grant_id="g2",principal="bob",scopes=["read"],expires_at=10)]
         self.assertFalse(evaluate(events,ENT)["decisions"][-1]["allowed"])
     def test_caller_cannot_self_assert_grantable_scopes(self):
@@ -32,7 +32,7 @@ class TemporalPolicyTests(unittest.TestCase):
         events=[self.grant(scopes=["admin"]),ev(2,"assume_admin",grant_id="g1",principal="alice",scope="admin",tenant="t1")]
         self.assertTrue(evaluate(events,ENT)["decisions"][-1]["allowed"])
     def test_assume_admin_rejects_stale_grant(self):
-        events=[self.grant(scopes=["admin"]),ev(2,"policy_update",version=2),
+        events=[self.grant(scopes=["admin"]),ev(2,"policy_update",actor="security_admin",version=2),
           ev(3,"assume_admin",grant_id="g1",principal="alice",scope="admin",tenant="t1")]
         self.assertFalse(evaluate(events,ENT)["decisions"][-1]["allowed"])
     def test_delegation_cannot_expand_scope(self):
