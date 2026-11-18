@@ -26,7 +26,8 @@ class RandomizedTemporalTraceTests(unittest.TestCase):
             x=make_episode(55,2,scenario)
             if x["unsafe"]:
                 self.assertTrue(x["minimal_failing_prefix"])
-                prefix_result=evaluate(x["minimal_failing_prefix"],ENTITLEMENTS)\n                self.assertFalse(prefix_result["decisions"][-1]["allowed"])
+                prefix_result=evaluate(x["minimal_failing_prefix"],ENTITLEMENTS)
+                self.assertFalse(prefix_result["decisions"][-1]["allowed"])
                 self.assertEqual(len(x["minimal_failing_prefix"]),x["first_violation_index"]+1)
     def test_campaign_accounts_for_every_episode(self):
         data=campaign(seed=8302,episodes=100)
