@@ -16,6 +16,10 @@ The earlier temporal model validated grant scope, expiry and policy version but 
 
 The event contract now requires the actor field for these three event types. The evaluator stores the grant issuer at grant creation.
 
+## Generator compatibility
+
+The G8.3.2 randomized temporal generator must emit the required semantic actor for policy-update events as well as revoke and delegate events. The stale-delegation scenario is retained as an adversarial case: its update is authorized, but the subsequent delegation is denied because the source grant is stale under the new policy version.
+
 ## Regression coverage
 
 Tests cover an unauthorized delegate attempting to use another principal's grant, successful delegation by the source principal, unauthorized revoke without state mutation, unauthorized policy update without version mutation, missing actor fields, and absence of the admin entitlement.
