@@ -1,0 +1,29 @@
+name: G8.3.15 Transactional Outbox
+on:
+  push:
+    branches:
+      - main
+      - research/g8.3.15-transactional-outbox
+    paths:
+      - "experiments/G8.3/**"
+      - ".github/workflows/g8-3-15-transactional-outbox.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.3/**"
+      - ".github/workflows/g8-3-15-transactional-outbox.yml"
+  workflow_dispatch:
+
+jobs:
+  transactional-outbox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install --upgrade cryptography
+      - name: Validate transactional replay ledger and outbox
+        working-directory: experiments/G8.3
+        run: |
+          python -m unittest test_durable_event_processor test_transactional_outbox -v

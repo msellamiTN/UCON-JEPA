@@ -40,6 +40,20 @@ class SQLiteEventProcessor:
                     result_json TEXT NOT NULL,
                     accepted_at INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS outbox (
+                    idempotency_key TEXT PRIMARY KEY,
+                    event_id TEXT NOT NULL REFERENCES processed_events(event_id),
+                    evaluation_id TEXT NOT NULL REFERENCES evaluations(evaluation_id),
+                    payload_json TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('pending','inflight','delivered')),
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    available_at REAL NOT NULL,
+                    lease_token TEXT,
+                    lease_until REAL,
+                    delivered_at REAL
+                );
+                CREATE INDEX IF NOT EXISTS outbox_ready
+                    ON outbox(status, available_at, lease_until);
             """)
 
     def _before_commit(self, connection: sqlite3.Connection) -> None:
@@ -56,7 +70,7 @@ class SQLiteEventProcessor:
         trusted_keys: Mapping[str, Mapping[str, Any]],
         trusted_entitlements: Mapping[str, list[str]] | None = None,
     ) -> dict:
-        """Authenticate, evaluate, and commit replay IDs + decision atomically."""
+        """Authenticate, evaluate, and commit replay IDs, decision, and outbox atomically."""
         connection = sqlite3.connect(self.database, timeout=30, isolation_level=None)
         try:
             connection.execute("PRAGMA synchronous=FULL")
@@ -71,28 +85,57 @@ class SQLiteEventProcessor:
             accepted_at = int(time.time())
             evaluation_id = str(uuid.uuid4())
             for envelope in signed_events:
+                event_id = envelope["event_id"]
                 connection.execute(
                     """INSERT INTO processed_events
                        (event_id, issuer, key_id, envelope_json, accepted_at)
                        VALUES (?, ?, ?, ?, ?)""",
                     (
-                        envelope["event_id"], envelope["issuer"], envelope["key_id"],
+                        event_id, envelope["issuer"], envelope["key_id"],
                         json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
                         accepted_at,
                     ),
                 )
+            result_json = json.dumps(result, sort_keys=True)
             connection.execute(
                 "INSERT INTO evaluations (evaluation_id, result_json, accepted_at) VALUES (?, ?, ?)",
-                (evaluation_id, json.dumps(result, sort_keys=True), accepted_at),
+                (evaluation_id, result_json, accepted_at),
             )
+            # The outbox row is part of the SAME transaction as the event and
+            # evaluation. A crash cannot leave a committed decision without
+            # its corresponding delivery intent.
+            for envelope in signed_events:
+                event_id = envelope["event_id"]
+                payload = {
+                    "schema": "ucon.decision.v1",
+                    "event_id": event_id,
+                    "evaluation_id": evaluation_id,
+                    "evaluation": result,
+                }
+                connection.execute(
+                    """INSERT INTO outbox
+                       (idempotency_key, event_id, evaluation_id, payload_json,
+                        status, attempts, available_at)
+                       VALUES (?, ?, ?, ?, 'pending', 0, ?)""",
+                    (
+                        f"{event_id}:ucon-decision:v1", event_id, evaluation_id,
+                        json.dumps(payload, sort_keys=True, separators=(",", ":")),
+                        time.time(),
+                    ),
+                )
             self._before_commit(connection)
             connection.execute("COMMIT")
             self._after_commit(connection)
-            return {"evaluation_id": evaluation_id, **result, "committed": True}
-        except Exception as exc:
+            return {
+                "evaluation_id": evaluation_id,
+                "outbox_count": len(signed_events),
+                **result,
+                "committed": True,
+            }
+        except Exception:
             if connection.in_transaction:
                 connection.execute("ROLLBACK")
-            raise exc
+            raise
         finally:
             connection.close()
 
@@ -101,3 +144,13 @@ class SQLiteEventProcessor:
             events = connection.execute("SELECT COUNT(*) FROM processed_events").fetchone()[0]
             evaluations = connection.execute("SELECT COUNT(*) FROM evaluations").fetchone()[0]
         return {"processed_events": events, "evaluations": evaluations}
+
+    def outbox_counts(self) -> dict:
+        with sqlite3.connect(self.database) as connection:
+            rows = connection.execute(
+                "SELECT status, COUNT(*) FROM outbox GROUP BY status"
+            ).fetchall()
+        counts = {"pending": 0, "inflight": 0, "delivered": 0}
+        counts.update({status: count for status, count in rows})
+        counts["total"] = sum(counts.values())
+        return counts
