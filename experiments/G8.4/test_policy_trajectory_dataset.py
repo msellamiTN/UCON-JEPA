@@ -48,6 +48,14 @@ class PolicyTrajectoryDatasetTests(unittest.TestCase):
         }
         self.assertEqual(_agent_action("goal_directed", state, None, random.Random(2)), "request")
 
+    def test_retrying_adversary_statistics_capture_repeated_denials(self):
+        ds = build_policy_dataset(seed=85, episodes_per_family_policy=40, episode_length=8)
+        stats = ds["manifest"]["policy_behavior_stats"]
+        for family in ("iam", "data", "sod"):
+            item = stats[f"retrying_adversary/{family}"]
+            self.assertEqual(item["denial_rate"], 1.0)
+            self.assertGreater(item["repeated_same_action_after_deny"], 0)
+
     def test_denial_does_not_mutate_protected_workflow_state(self):
         ctx = {"family": "sod", "security_admin": False, "scope_match": True,
                "clearance": 1, "classification": 2, "export_approved": False,
