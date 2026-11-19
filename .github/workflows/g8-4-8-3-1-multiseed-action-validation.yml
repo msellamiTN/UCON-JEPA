@@ -1,0 +1,36 @@
+name: G8.4.8.3.1 Multi-Seed Action Validation
+
+on:
+  push:
+    branches:
+      - research/g8.4.8.3.1-multiseed-action-validation
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-3-1-multiseed-action-validation.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-3-1-multiseed-action-validation.yml"
+  workflow_dispatch:
+
+jobs:
+  multiseed-action-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run all G8.4 regression tests
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Execute five-seed in-policy and LOPO validation with episode bootstrap
+        working-directory: experiments/G8.4
+        run: python action_policy_multiseed.py --seeds 20261120,20261121,20261122,20261123,20261124 --episodes-per-family-policy 300 --episode-length 8 --bootstrap-replicates 1000 --out action-multiseed-output
+      - name: Retain multi-seed metrics and paired episode-bootstrap intervals
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-3-1-multiseed-action-validation
+          path: experiments/G8.4/action-multiseed-output/
