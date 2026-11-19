@@ -77,7 +77,7 @@ def _make_windows(partition: dict[str, np.ndarray], horizon: int) -> dict[str, n
         raise ValueError("horizon must be positive")
     out: dict[str, list[Any]] = {
         "context": [], "actions": [], "security": [], "episode_id": [],
-        "family": [], "start_step": [],
+        "family": [], "agent_policy": [], "start_step": [],
     }
     for episode_id in sorted(set(partition["episode_id"].tolist())):
         indices = np.flatnonzero(partition["episode_id"] == episode_id)
@@ -92,6 +92,7 @@ def _make_windows(partition: dict[str, np.ndarray], horizon: int) -> dict[str, n
             out["security"].append(partition["security"][chosen])
             out["episode_id"].append(str(episode_id))
             out["family"].append(partition["family"][chosen[0]])
+            out["agent_policy"].append(partition["agent_policy"][chosen[0]])
             out["start_step"].append(int(partition["step"][chosen[0]]))
     if not out["context"]:
         raise ValueError(f"no complete windows for horizon {horizon}")
@@ -101,6 +102,7 @@ def _make_windows(partition: dict[str, np.ndarray], horizon: int) -> dict[str, n
         "security": np.asarray(out["security"], dtype=np.float64),
         "episode_id": np.asarray(out["episode_id"]),
         "family": np.asarray(out["family"]),
+        "agent_policy": np.asarray(out["agent_policy"]),
         "start_step": np.asarray(out["start_step"], dtype=np.int64),
     }
 
@@ -286,12 +288,24 @@ def evaluate_horizon(
     e2_security_loss = np.square(e2_pred - truth).mean(axis=1)
 
     def summarize(pred: np.ndarray) -> dict[str, Any]:
+        by_policy_family = {}
+        for policy in sorted(set(windows["agent_policy"].tolist())):
+            for family in sorted(set(windows["family"].tolist())):
+                mask = (windows["agent_policy"] == policy) & (windows["family"] == family)
+                if np.any(mask):
+                    by_policy_family[f"{policy}/{family}"] = {
+                        "violation": binary_metrics(truth[mask, 0], pred[mask, 0]),
+                        "security_mse": float(np.square(pred[mask] - truth[mask]).mean()),
+                        "windows": int(mask.sum()),
+                        "episodes": int(len(set(windows["episode_id"][mask].tolist()))),
+                    }
         return {
             "violation": binary_metrics(truth[:, 0], pred[:, 0]),
             "security_mse": float(np.square(pred - truth).mean()),
             "terminal_state_mse": float(np.square(pred[:, 1:] - truth[:, 1:]).mean()),
             "windows": int(len(pred)),
             "episodes": int(len(set(windows["episode_id"].tolist()))),
+            "by_policy_family": by_policy_family,
         }
 
     return {
