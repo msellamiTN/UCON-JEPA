@@ -201,6 +201,7 @@ class LinearActionConditionedSupervised:
         if min(context_dim, action_dim, security_dim) < 1:
             raise ValueError("all feature dimensions must be positive")
         self.config = config
+        self.context_dim, self.action_dim, self.security_dim = context_dim, action_dim, security_dim
         rng = np.random.default_rng(config.seed)
         scale = 1.0 / np.sqrt(config.latent_dim)
         self.W_context = rng.normal(0, scale, (context_dim, config.latent_dim))
