@@ -1,0 +1,35 @@
+name: G8.4.5 Compositional Generalization
+on:
+  push:
+    branches:
+      - main
+      - research/g8.4.5-compositional-generalization
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-5-compositional.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-5-compositional.yml"
+  workflow_dispatch:
+
+jobs:
+  compositional:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Unit tests
+        working-directory: experiments/G8.4
+        run: python -m unittest -v
+      - name: Run compositional evaluation
+        working-directory: experiments/G8.4
+        run: python compositional_benchmark.py --seeds 2041 2042 2043 --episodes-per-family 1200 --epochs 100 --out compositional-output
+      - name: Retain compositional results
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-5-compositional-benchmark
+          path: experiments/G8.4/compositional-output/compositional_benchmark.json
