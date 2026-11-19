@@ -19,6 +19,18 @@ class RecursiveRiskForecastingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _fit_platt(np.asarray([0.1, 0.2, 0.3]), np.asarray([0, 0, 0]))
 
+    def test_platt_calibrator_is_bounded_under_complete_separation(self):
+        scores = np.asarray([1e-8] * 8 + [1.0 - 1e-8] * 8)
+        labels = np.asarray([0] * 8 + [1] * 8)
+        params = _fit_platt(scores, labels)
+        calibrated = _apply_platt(scores, params)
+        self.assertTrue(np.all(np.isfinite(list(params.values()))))
+        self.assertLessEqual(abs(params["slope"]), 50.0)
+        self.assertLessEqual(abs(params["intercept"]), 50.0)
+        self.assertTrue(np.all(np.isfinite(calibrated)))
+        self.assertTrue(np.all((calibrated > 0.0) & (calibrated < 1.0)))
+        self.assertLess(float(calibrated[0]), float(calibrated[-1]))
+
     def test_small_recursive_e1_e2_benchmark(self):
         result = run_seed(
             seed=20261120,
