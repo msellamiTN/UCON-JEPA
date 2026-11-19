@@ -1,0 +1,80 @@
+name: G7 PostgreSQL HA lab validation
+
+on:
+  push:
+    branches: [research/g7-conditional-api-adapter]
+    paths:
+      - "experiments/G7/ha/**"
+      - ".github/workflows/g7-ha-lab.yml"
+  pull_request:
+    paths:
+      - "experiments/G7/ha/**"
+      - ".github/workflows/g7-ha-lab.yml"
+  workflow_dispatch:
+jobs:
+  compose-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare local-only environment file
+        working-directory: experiments/G7/ha
+        run: cp .env.example .env
+      - name: Validate Compose model
+        working-directory: experiments/G7/ha
+        run: docker compose -f compose.yaml config --quiet
+      - name: Build Patroni PostgreSQL image
+        working-directory: experiments/G7/ha
+        run: docker compose -f compose.yaml build pg1
+
+  cluster-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare isolated lab credentials
+        working-directory: experiments/G7/ha
+        run: |
+          cat > .env <<'EOF'
+          PATRONI_SUPERUSER_PASSWORD=local-only-change-me
+          PATRONI_REPLICATION_PASSWORD=local-only-repl-change-me
+          EOF
+      - name: Start three-node Patroni cluster
+        working-directory: experiments/G7/ha
+        run: docker compose -f compose.yaml up -d
+      - name: Wait for quorum, leader, replicas, and HAProxy read/write
+        working-directory: experiments/G7/ha
+        env:
+          PATRONI_SUPERUSER_PASSWORD: local-only-change-me
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          KEEP_CLUSTER: "1"
+        run: bash smoke_test.sh
+      - name: Guarded primary process crash experiment
+        working-directory: experiments/G7/ha
+        if: success()
+        env:
+          PATRONI_SUPERUSER_PASSWORD: local-only-change-me
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: bash primary_crash_experiment.sh
+      - name: Preserve cluster diagnostics
+        if: always()
+        working-directory: experiments/G7/ha
+        run: |
+          docker compose -f compose.yaml ps > ha-smoke-status.log || true
+          docker compose -f compose.yaml logs --no-color > ha-smoke-compose-final.log || true
+      - name: Upload smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g7-ha-smoke-evidence
+          path: |
+            experiments/G7/ha/ha-smoke-compose.log
+            experiments/G7/ha/ha-smoke-status.log
+            experiments/G7/ha/ha-smoke-compose-final.log
+            experiments/G7/ha/ha-primary-crash-results.env
+          if-no-files-found: warn
+      - name: Tear down cluster
+        if: always()
+        working-directory: experiments/G7/ha
+        run: docker compose -f compose.yaml down -v --remove-orphans

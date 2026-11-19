@@ -1,0 +1,142 @@
+name: ucon-jepa-ha
+
+services:
+  etcd1:
+    image: quay.io/coreos/etcd:v3.5.17
+    command: >
+      /usr/local/bin/etcd
+      --name etcd1
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://etcd1:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://etcd1:2380
+      --initial-cluster etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      --initial-cluster-state new
+      --initial-cluster-token ucon-jepa-ha
+    volumes: [etcd1-data:/etcd-data]
+    networks: [ha]
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  etcd2:
+    image: quay.io/coreos/etcd:v3.5.17
+    command: >
+      /usr/local/bin/etcd
+      --name etcd2
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://etcd2:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://etcd2:2380
+      --initial-cluster etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      --initial-cluster-state new
+      --initial-cluster-token ucon-jepa-ha
+    volumes: [etcd2-data:/etcd-data]
+    networks: [ha]
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  etcd3:
+    image: quay.io/coreos/etcd:v3.5.17
+    command: >
+      /usr/local/bin/etcd
+      --name etcd3
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://etcd3:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://etcd3:2380
+      --initial-cluster etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      --initial-cluster-state new
+      --initial-cluster-token ucon-jepa-ha
+    volumes: [etcd3-data:/etcd-data]
+    networks: [ha]
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  pg1:
+    image: ucon-jepa-patroni:local
+    build: .
+    hostname: pg1
+    environment:
+      PATRONI_NAME: pg1
+      PATRONI_RESTAPI_CONNECT_ADDRESS: pg1:8008
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: pg1:5432
+      PATRONI_SUPERUSER_PASSWORD: ${PATRONI_SUPERUSER_PASSWORD:-local-only-change-me}
+      PATRONI_REPLICATION_PASSWORD: ${PATRONI_REPLICATION_PASSWORD:-local-only-repl-change-me}
+    volumes:
+      - pg1-data:/var/lib/postgresql/data
+      - ./patroni.yml:/etc/patroni.yml:ro
+    depends_on:
+      etcd1: {condition: service_healthy}
+      etcd2: {condition: service_healthy}
+      etcd3: {condition: service_healthy}
+    networks: [ha]
+
+  pg2:
+    image: ucon-jepa-patroni:local
+    hostname: pg2
+    environment:
+      PATRONI_NAME: pg2
+      PATRONI_RESTAPI_CONNECT_ADDRESS: pg2:8008
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: pg2:5432
+      PATRONI_SUPERUSER_PASSWORD: ${PATRONI_SUPERUSER_PASSWORD:-local-only-change-me}
+      PATRONI_REPLICATION_PASSWORD: ${PATRONI_REPLICATION_PASSWORD:-local-only-repl-change-me}
+    volumes:
+      - pg2-data:/var/lib/postgresql/data
+      - ./patroni.yml:/etc/patroni.yml:ro
+    depends_on:
+      etcd1: {condition: service_healthy}
+      etcd2: {condition: service_healthy}
+      etcd3: {condition: service_healthy}
+    networks: [ha]
+
+  pg3:
+    image: ucon-jepa-patroni:local
+    hostname: pg3
+    environment:
+      PATRONI_NAME: pg3
+      PATRONI_RESTAPI_CONNECT_ADDRESS: pg3:8008
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: pg3:5432
+      PATRONI_SUPERUSER_PASSWORD: ${PATRONI_SUPERUSER_PASSWORD:-local-only-change-me}
+      PATRONI_REPLICATION_PASSWORD: ${PATRONI_REPLICATION_PASSWORD:-local-only-repl-change-me}
+    volumes:
+      - pg3-data:/var/lib/postgresql/data
+      - ./patroni.yml:/etc/patroni.yml:ro
+    depends_on:
+      etcd1: {condition: service_healthy}
+      etcd2: {condition: service_healthy}
+      etcd3: {condition: service_healthy}
+    networks: [ha]
+
+  haproxy:
+    image: haproxy:3.0.7
+    ports:
+      - "5000:5000"
+      - "7000:7000"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on: [pg1, pg2, pg3]
+    networks: [ha]
+
+networks:
+  ha:
+    driver: bridge
+
+volumes:
+  etcd1-data:
+  etcd2-data:
+  etcd3-data:
+  pg1-data:
+  pg2-data:
+  pg3-data:
