@@ -47,6 +47,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G8.4.8.6 | experiments/G8.4/G8.4.8.6_RESULTS.md | Three-seed, five-policy LOPO joint JEPA benchmark passed; mixed policy-specific effects, horizon-8 discrimination weak; policy-robust generalization not established |
 | G8.4.8.7 | docs/research/G8.4.8.7_POLICY_SHIFT_PROTOCOL.md | Pre-registered controlled within-archetype parameter extrapolation protocol; implementation and experiments not yet run |
 | G8.4.8.7.1 | docs/research/G8.4.8.7.1_DATASET_SMOKE_RESULTS.md | Parameterized five-archetype dataset; five-seed smoke generation, full G8.4 regressions, partition isolation and artifact checksums passed; full-scale model evaluation remains open |
+| G8.4.8.7.2 | docs/research/G8.4.8.7.2_ACTION_BASELINE_RESULTS.md | Five-seed full action baseline under rho=0.85 and reverse rho=0.05; past-only softmax wins pooled NLL/Brier but not every archetype; JEPA evaluation remains open |
 
 ## Critical statistical boundary
 
