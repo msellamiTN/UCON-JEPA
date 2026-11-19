@@ -34,30 +34,71 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
 
 
 def _fit_platt(scores: np.ndarray, labels: np.ndarray) -> dict[str, float]:
-    """Fit a two-parameter logistic calibrator on nominal calibration episodes."""
+    """Fit ridge-regularized Platt calibration on nominal calibration episodes.
+
+    Standardizing the score logits makes the fixed slope penalty meaningful
+    across seeds and horizons. The intercept is unpenalized; the standardized
+    slope has a predeclared L2 penalty of 1.0 to prevent separation-driven
+    coefficient explosion on nearly deterministic privileged E1 scores.
+    """
     x = _logit(scores)
     y = np.asarray(labels, dtype=np.float64)
     if len(x) != len(y) or len(np.unique(y)) != 2:
         raise ValueError("risk calibration requires aligned examples from both classes")
-    design = np.column_stack((np.ones(len(x)), x))
-    beta = np.asarray([0.0, 1.0], dtype=np.float64)
-    penalty = np.diag([1e-8, 1e-5])
-    for _ in range(100):
+    center = float(np.mean(x))
+    scale = float(np.std(x))
+    if not np.isfinite(scale) or scale < 1e-8:
+        scale = 1.0
+    z = (x - center) / scale
+    design = np.column_stack((np.ones(len(z)), z))
+    prevalence = float(np.clip(y.mean(), EPS, 1.0 - EPS))
+    beta = np.asarray([np.log(prevalence / (1.0 - prevalence)), 0.0], dtype=np.float64)
+    penalty = np.diag([0.0, 1.0])
+
+    def objective(candidate: np.ndarray) -> float:
+        eta = design @ candidate
+        return float(np.sum(np.logaddexp(0.0, eta) - y * eta)
+                     + 0.5 * candidate @ penalty @ candidate)
+
+    current = objective(beta)
+    iterations = 0
+    for iterations in range(1, 201):
         p = _sigmoid(design @ beta)
-        weights = np.maximum(p * (1.0 - p), 1e-8)
+        weights = np.maximum(p * (1.0 - p), 1e-10)
         gradient = design.T @ (p - y) + penalty @ beta
         hessian = (design.T * weights) @ design + penalty
         step = np.linalg.solve(hessian, gradient)
-        beta -= step
-        if np.linalg.norm(step) < 1e-9:
+        if not np.all(np.isfinite(step)):
+            raise FloatingPointError("non-finite Platt calibration update")
+        if np.linalg.norm(step) < 1e-8:
             break
-    if not np.all(np.isfinite(beta)):
-        raise FloatingPointError("non-finite Platt calibration parameters")
-    return {"intercept": float(beta[0]), "slope": float(beta[1])}
+        # Backtracking prevents a Newton step from increasing the penalized
+        # calibration objective when the score distribution is highly separated.
+        factor = 1.0
+        accepted = False
+        for _ in range(40):
+            candidate = beta - factor * step
+            candidate_objective = objective(candidate)
+            if np.isfinite(candidate_objective) and candidate_objective <= current:
+                beta, current, accepted = candidate, candidate_objective, True
+                break
+            factor *= 0.5
+        if not accepted:
+            break
+        if np.linalg.norm(factor * step) < 1e-8:
+            break
+    if not np.all(np.isfinite(beta)) or abs(float(beta[1])) > 50.0:
+        raise FloatingPointError("unstable Platt calibration parameters")
+    return {
+        "intercept": float(beta[0]), "slope": float(beta[1]),
+        "center": center, "scale": scale, "slope_l2_penalty": 1.0,
+        "iterations": int(iterations),
+    }
 
 
 def _apply_platt(scores: np.ndarray, params: dict[str, float]) -> np.ndarray:
-    return _sigmoid(params["intercept"] + params["slope"] * _logit(scores))
+    z = (_logit(scores) - params["center"]) / params["scale"]
+    return _sigmoid(params["intercept"] + params["slope"] * z)
 
 
 def _predict_risk_pair(
