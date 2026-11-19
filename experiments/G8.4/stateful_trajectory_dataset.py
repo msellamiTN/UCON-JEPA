@@ -159,6 +159,10 @@ def _episode(seed: int, family: str, length: int) -> list[dict]:
 
         # Independent policy oracle labels the candidate transition.
         oracle_allowed, oracle_reason = _policy_oracle(state, action)
+        # The reference oracle names the violated constraint; successful
+        # admissions have no violation reason, matching the online gate contract.
+        if oracle_allowed:
+            oracle_reason = None
         after, gate_allowed, gate_reason = _online_gate_step(state, action)
         if oracle_allowed != gate_allowed or oracle_reason != gate_reason:
             raise AssertionError(
