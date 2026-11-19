@@ -49,10 +49,11 @@ def _allowed_mask(context: np.ndarray) -> np.ndarray:
 
 
 def _normalize_rows(prob: np.ndarray) -> np.ndarray:
-    p = np.asarray(prob, dtype=np.float64)
-    p = np.clip(p, EPS, None)
-    p /= p.sum(axis=1, keepdims=True)
-    return p
+    p = np.maximum(np.asarray(prob, dtype=np.float64), 0.0)
+    totals = p.sum(axis=1, keepdims=True)
+    if np.any(totals <= 0.0):
+        raise ValueError("probability row has no mass")
+    return p / totals
 
 
 class MajorityActionPredictor:
@@ -64,7 +65,6 @@ class MajorityActionPredictor:
         for f in range(3):
             for a in y[fam == f]:
                 self.counts[f, a] += 1
-        self.counts += 1e-3 * _allowed_mask(np.eye(3)[np.arange(3)] if False else context[:3]).sum(axis=0)[None, :] if False else 0
         return self
 
     def predict_proba(self, context: np.ndarray) -> np.ndarray:
@@ -72,7 +72,6 @@ class MajorityActionPredictor:
         p = self.counts[fam].copy()
         for i, name in enumerate(FAMILY_ORDER):
             allowed = [ACTION_TO_INDEX[a] for a in FAMILY_ACTIONS[name]]
-            p[fam == i][:, :] if False else None
             p[np.ix_(fam == i, np.arange(ACTION_DIM))] += 1e-3
             disallowed = sorted(set(range(ACTION_DIM)) - set(allowed))
             p[np.ix_(fam == i, disallowed)] = 0.0
