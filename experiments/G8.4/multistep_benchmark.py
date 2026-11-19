@@ -120,6 +120,9 @@ def _score(method_predictions, test, horizon):
 def evaluate_seed(seed, episodes_per_family, epochs):
     dataset = build_dataset(seed=seed, episodes_per_family=episodes_per_family, episode_length=8)
     by_horizon = {}
+    one_step_model = None
+    one_step_context_scaler = None
+    one_step_action_scaler = None
     for horizon in HORIZONS:
         train = make_windows(dataset["train"], horizon)
         validation = make_windows(dataset["validation"], horizon)
@@ -144,6 +147,8 @@ def evaluate_seed(seed, episodes_per_family, epochs):
         }
         if horizon == 1:
             one_step_model = model
+            one_step_context_scaler = cp
+            one_step_action_scaler = ap
         # Validation is kept separate and reported; it is not used to tune the
         # fixed 0.5 operating threshold or inspect test outcomes.
         xv = transform(validation["context"], cp)
@@ -157,13 +162,19 @@ def evaluate_seed(seed, episodes_per_family, epochs):
             "episodes": int(len(set(validation["episode_id"].tolist()))),
         }
         if horizon == 1:
-            # Save the one-step training model for genuine recursive latent rollout.
+            # Preserve the one-step model and its own preprocessing for rollout.
             one_step_model = model
+            one_step_context_scaler = cp
+            one_step_action_scaler = ap
         else:
             # Recursive rollout is evaluated on the same horizon windows, with
             # each action step supplied in its original order.
             raw_actions = test["actions"].reshape(len(test["actions"]), horizon, -1)
-            recursive = _predict_recursive(one_step_model, xt, raw_actions)
+            rollout_actions = transform(
+                raw_actions.reshape(-1, raw_actions.shape[-1]), one_step_action_scaler
+            ).reshape(raw_actions.shape)
+            rollout_context = transform(test["context"], one_step_context_scaler)
+            recursive = _predict_recursive(one_step_model, rollout_context, rollout_actions)
             predictions["recursive_one_step_jepa"] = recursive
         by_horizon[str(horizon)] = {
             "train_windows": int(len(train["context"])),
