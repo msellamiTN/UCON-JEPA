@@ -86,29 +86,6 @@ def _predict_risk_pair(
     }
 
 
-def _episode_bootstrap_brier(
-    e2: np.ndarray, e1: np.ndarray, episode_ids: np.ndarray,
-    seed: int, replicates: int,
-) -> dict[str, Any]:
-    ids = sorted(set(episode_ids.tolist()))
-    differences = []
-    for episode_id in ids:
-        mask = episode_ids == episode_id
-        differences.append(float(np.mean((e2[mask] - 0.0) ** 2) - np.mean((e1[mask] - 0.0) ** 2)))
-    # The preceding expression is replaced below by paired per-window losses
-    # at the call site; this helper accepts loss vectors, not probabilities.
-    differences = np.asarray(differences, dtype=np.float64)
-    rng = np.random.default_rng(seed)
-    draws = rng.integers(0, len(ids), size=(replicates, len(ids)))
-    means = differences[draws].mean(axis=1)
-    return {
-        "unit": "whole episode", "episodes": len(ids), "replicates": replicates,
-        "e2_minus_e1_mean": float(differences.mean()),
-        "ci95_percentile": [float(np.quantile(means, .025)), float(np.quantile(means, .975))],
-        "negative_favours_E2": True,
-    }
-
-
 def _paired_loss_bootstrap(
     e2_loss: np.ndarray, e1_loss: np.ndarray, episode_ids: np.ndarray,
     seed: int, replicates: int,
