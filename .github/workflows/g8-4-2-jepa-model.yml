@@ -1,0 +1,27 @@
+name: G8.4.2 JEPA Model
+on:
+  push:
+    branches:
+      - main
+      - research/g8.4.2-linear-action-conditioned-jepa
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-2-jepa-model.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-2-jepa-model.yml"
+  workflow_dispatch:
+
+jobs:
+  jepa-model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install numpy
+      - name: Validate JEPA model roles and training
+        working-directory: experiments/G8.4
+        run: python -m unittest -v
