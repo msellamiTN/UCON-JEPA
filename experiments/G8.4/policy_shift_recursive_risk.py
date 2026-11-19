@@ -12,7 +12,7 @@ from typing import Any
 
 import numpy as np
 
-from policy_parameter_dataset import build_dataset
+from policy_parameter_dataset import build_dataset, write_dataset
 from predictive_benchmark import metrics as binary_metrics
 from uncertain_action_jepa import (
     _make_windows, _transform, fit_e1_e2_models,
@@ -122,8 +122,11 @@ def _group_metrics(windows: dict[str, np.ndarray], truth: np.ndarray,
 
 
 def run_seed(seed: int, episodes_per_cell: int = 300, epochs: int = 180,
-             mc_samples: int = 32, bootstrap_replicates: int = 2000) -> dict[str, Any]:
+             mc_samples: int = 32, bootstrap_replicates: int = 2000,
+             out_dir: Path | None = None) -> dict[str, Any]:
     dataset = build_dataset(seed=seed, episodes_per_cell=episodes_per_cell)
+    if out_dir is not None:
+        write_dataset(dataset, out_dir / f"dataset-{seed}")
     model, action_model, _raw_action_model, scalers = fit_e1_e2_models(
         dataset, seed=seed, epochs=epochs
     )
@@ -229,7 +232,7 @@ def main() -> None:
         raise ValueError("provide distinct seeds")
     args.out.mkdir(parents=True, exist_ok=True)
     runs = {str(seed): run_seed(seed, args.episodes_per_cell, args.epochs,
-                                args.mc_samples, args.bootstrap_replicates) for seed in seeds}
+                                args.mc_samples, args.bootstrap_replicates, args.out) for seed in seeds}
     result = {
         "benchmark": "G8.4.8.7.4 recursive E1/E2 future-DENY forecasting under controlled rho shift",
         "seeds": seeds, "runs": runs, "summary": summarize(runs),
