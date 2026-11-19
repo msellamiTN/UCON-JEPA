@@ -60,11 +60,20 @@ class PastOnlyActionPredictionTests(unittest.TestCase):
         model = FirstOrderMarkovPredictor().fit(tr["context"], tr["action"], tr["episode_id"], tr["step"])
         prev = _previous_actions(te)
         before = model.predict_proba(te["context"], prev)
-        changed_future = te["action"].copy()
-        # Alter a row's future target; it must not affect prediction at that row.
-        changed_future[3] = np.roll(changed_future[3], 1)
-        after = model.predict_proba(te["context"], prev)
-        np.testing.assert_array_equal(before, after)
+        mutated = {key: value.copy() for key, value in te.items()}
+        # Change the realized action at t. It is a target at t, not an input
+        # until it becomes an observed past action for t+1.
+        candidate = next(i for i, step in enumerate(te["step"]) if step < 7)
+        mutated["action"][candidate] = np.roll(mutated["action"][candidate], 1)
+        changed_prev = _previous_actions(mutated)
+        after = model.predict_proba(te["context"], changed_prev)
+        np.testing.assert_array_equal(before[candidate], after[candidate])
+        same_episode_next = np.flatnonzero(
+            (te["episode_id"] == te["episode_id"][candidate])
+            & (te["step"] == te["step"][candidate] + 1)
+        )
+        self.assertEqual(len(same_episode_next), 1)
+        self.assertNotEqual(prev[same_episode_next[0]], changed_prev[same_episode_next[0]])
 
     def test_lopo_fitting_and_calibration_exclude_held_out_policy(self):
         for policy in AGENT_POLICIES:
