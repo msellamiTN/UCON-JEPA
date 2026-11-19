@@ -75,8 +75,6 @@ class JointActionStateJEPA(LinearActionConditionedJEPA):
         if np.any(yt < 0) or not np.allclose(yt.sum(axis=1), 1.0, atol=1e-8):
             raise ValueError("action_targets must be one-hot rows")
         allowed = self._mask(fam, self.action_dim)
-        if np.any(np.argmax(yt, axis=1)[~allowed.any(axis=1)] >= self.action_dim):
-            raise ValueError("invalid action target")
         for i in range(n):
             if not allowed[i, int(np.argmax(yt[i]))]:
                 raise ValueError("action target is invalid for its family")
