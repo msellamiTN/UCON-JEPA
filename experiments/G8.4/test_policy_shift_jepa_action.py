@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 
 from policy_shift_jepa_action import MODEL_NAMES, run_seed
 
@@ -27,10 +28,12 @@ class PolicyShiftJEPAActionTests(unittest.TestCase):
             for model in MODEL_NAMES:
                 for metric in ("nll", "top1_accuracy", "top2_accuracy",
                                "multiclass_brier", "top_label_ece_10bin"):
-                    self.assertTrue(
-                        0.0 <= split["calibrated_metrics"][model][metric]
-                        or metric in ("nll",)
-                    )
+                    self.assertTrue(np.isfinite(split["calibrated_metrics"][model][metric]))
+                    if metric in ("top1_accuracy", "top2_accuracy", "top_label_ece_10bin"):
+                        self.assertGreaterEqual(split["calibrated_metrics"][model][metric], 0.0)
+                        self.assertLessEqual(split["calibrated_metrics"][model][metric], 1.0)
+                    if metric == "multiclass_brier":
+                        self.assertGreaterEqual(split["calibrated_metrics"][model][metric], 0.0)
 
 
 if __name__ == "__main__":
