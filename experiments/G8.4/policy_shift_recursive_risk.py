@@ -138,9 +138,18 @@ def run_seed(seed: int, episodes_per_cell: int = 300, epochs: int = 180,
         )
     calibrators = {}
     for horizon, pred in calibration_predictions.items():
+        # Use exactly one predeclared start (step 0) per calibration episode.
+        # Sliding calibration windows overlap and must not be treated as independent.
+        independent = pred["windows"]["start_step"] == 0
         calibrators[horizon] = {
-            "E1_known_action_privileged": _fit_platt(pred["e1_raw"], pred["truth"]),
-            "E2_predicted_action": _fit_platt(pred["e2_raw"], pred["truth"]),
+            "E1_known_action_privileged": _fit_platt(
+                pred["e1_raw"][independent], pred["truth"][independent]
+            ),
+            "E2_predicted_action": _fit_platt(
+                pred["e2_raw"][independent], pred["truth"][independent]
+            ),
+            "calibration_episodes": int(independent.sum()),
+            "calibration_window_rule": "one step-0 window per episode",
         }
 
     tests = {}
