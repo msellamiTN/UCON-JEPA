@@ -45,6 +45,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G8.4.8.4 | experiments/G8.4/G8.4.8.4_RESULTS.md | E1 privileged known-action vs E2 predicted-action JEPA; three seeds and horizons 1/2/4/8; current E2 long-horizon discrimination near chance |
 | G8.4.8.5 | experiments/G8.4/G8.4.8.5_RESULTS.md | Joint action/state JEPA with auxiliary action loss; short-horizon E2 improves over post-hoc latent head, horizon-8 risk discrimination remains unresolved |
 | G8.4.8.6 | experiments/G8.4/G8.4.8.6_RESULTS.md | Three-seed, five-policy LOPO joint JEPA benchmark passed; mixed policy-specific effects, horizon-8 discrimination weak; policy-robust generalization not established |
+| G8.4.8.7 | docs/research/G8.4.8.7_POLICY_SHIFT_PROTOCOL.md | Pre-registered controlled within-archetype parameter extrapolation protocol; implementation and experiments not yet run |
 
 ## Critical statistical boundary
 
