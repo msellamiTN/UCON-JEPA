@@ -50,6 +50,22 @@ class JointActionStateJEPATests(unittest.TestCase):
         names = set(inspect.signature(self.model.predict_action_proba).parameters)
         self.assertEqual(names, {"context_latent", "family_onehot"})
 
+    def test_paired_joint_vs_posthoc_bootstrap_resamples_episodes(self):
+        from joint_action_state_jepa import _paired_joint_vs_posthoc_bootstrap
+        joint = [
+            {"episode_id": "ep1", "risk_brier": 0.1, "security_mse": 0.2},
+            {"episode_id": "ep2", "risk_brier": 0.2, "security_mse": 0.3},
+        ]
+        posthoc = [
+            {"episode_id": "ep1", "risk_brier": 0.2, "security_mse": 0.3},
+            {"episode_id": "ep2", "risk_brier": 0.3, "security_mse": 0.4},
+        ]
+        result = _paired_joint_vs_posthoc_bootstrap(joint, posthoc, "risk_brier", 123, 200)
+        self.assertEqual(result["unit"], "whole episode")
+        self.assertEqual(result["episodes"], 2)
+        self.assertAlmostEqual(result["joint_minus_posthoc_mean"], -0.1)
+        self.assertTrue(result["ci95_percentile"][1] <= 0.0)
+
     def test_action_target_family_mismatch_is_rejected(self):
         cfg = JEPAConfig(latent_dim=8, learning_rate=0.008, epochs=1, batch_size=32, seed=88)
         wrong = self.action_targets[:8].copy()
