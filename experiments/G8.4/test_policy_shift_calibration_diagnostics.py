@@ -34,7 +34,7 @@ class CalibrationDirectionDiagnosticTests(unittest.TestCase):
         self.assertEqual(set(result["tests"]), {"test_shifted", "test_reverse"})
         for split, horizons in result["tests"].items():
             self.assertEqual(set(horizons), {"1", "2", "4", "8"})
-            for report in horizons.values():
+            for horizon, report in horizons.items():
                 self.assertEqual(
                     report["calibration"]["unconstrained_platt"]["slope_l2_penalty"],
                     1.0,
@@ -47,9 +47,7 @@ class CalibrationDirectionDiagnosticTests(unittest.TestCase):
                     report["calibration"]["raw_score"]["n"],
                 )
                 self.assertEqual(
-                    len(report["test"]["instrumented_rollout_steps"]),
-                    int(next(iter(horizons.keys()))) if False else
-                    len(report["test"]["instrumented_rollout_steps"]),
+                    len(report["test"]["instrumented_rollout_steps"]), int(horizon)
                 )
                 self.assertTrue(np.isfinite(
                     report["test"]["all_windows"]["raw_metrics"]["auroc"]
