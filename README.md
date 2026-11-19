@@ -31,7 +31,12 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G6.3 | formal/tla/G6_RuntimeEnforcement.tla | Core finite-state TLA+ model encoded |
 | G6.4 | docs/verification/G6.4_TLC_RESULTS.md | Bounded TLC run passed; four negative-control mutants detected; refinement open |
 | G6.5 | docs/verification/G6.5_REFINEMENT_AND_TESTS.md | Refinement matrix specified; ten abstract runtime contract tests pass; production refinement open |
-| G6.6 | paper/formal/g6_runtime_assurance.tex | Full G6 assurance dossier passes three-pass CI and cross-reference checks; proof-premise revalidation pending |\n| G8.4.1 | docs/research/G8.4.1_JEPA_ROLE_CONTRACT.md | JEPA component roles, information boundaries, and UCON non-authority contract specified; neural implementation and predictive evaluation open |
+| G6.6 | paper/formal/g6_runtime_assurance.tex | Full G6 assurance dossier passes three-pass CI and cross-reference checks; proof-premise revalidation pending |\n| G8.4.1 | docs/research/G8.4.1_JEPA_ROLE_CONTRACT.md | JEPA component roles, information boundaries, and UCON non-authority contract specified |
+| G8.4.2 | experiments/G8.4/jepa_numpy.py | Trainable linear JEPA reference with context/action encoders, predictor, EMA target encoder, anti-collapse variance term, and security decoder; high-capacity architecture remains open |
+| G8.4.3 | experiments/G8.4/stateful_trajectory_dataset.py | Stateful synthetic IAM, data-export, and SoD trajectories; episode-disjoint partitions and independent policy-oracle/online-gate cross-check |
+| G8.4.4 | experiments/G8.4/predictive_benchmark.py | Initial action-conditioned JEPA vs same-input supervised and ablation benchmark; synthetic baseline evidence recorded |
+| G8.4.5 | experiments/G8.4/G8.4.5_RESULTS.md | Three held-out action compositions evaluated; supervised context+action baseline outperformed JEPA on principal metrics |
+| G8.4.6 | experiments/G8.4/G8.4.6_RESULTS.md | Direct and recursive horizons 1/2/4/8; capacity-matched controls and seed-stratified paired episode bootstrap; qualified recursive-rollout result, no absolute long-horizon security utility claim |
 
 ## Critical statistical boundary
 
@@ -53,7 +58,7 @@ No empirical result is claimed until the corresponding experiment is implemented
     paper/formal/        G4, G5, and G6 LaTeX assurance dossiers
     formal/tla/          TLA+ runtime-enforcement model and TLC configurations
     tests/G6/            Executable abstract runtime contract tests
-    experiments/G5/      risk-control code, tests, results\n    experiments/G8.4/    JEPA role interfaces and authority-boundary tests
+    experiments/G5/      risk-control code, tests, results\n    experiments/G8.4/    JEPA role contract, NumPy model, stateful trajectories, and predictive benchmarks
     .github/workflows/   automated validation
 
 ## Reproducibility
@@ -65,7 +70,7 @@ Run the G5 synthetic experiment:
     python trajectory_risk_control.py --repetitions 2000 --sample-size 1500 --output results.csv
     python -m unittest discover -s . -p 'test_*.py'
 
-CI compiles the G4, G5, and G6 LaTeX dossiers and runs the G5 and G6 Python test suites on pushes and pull requests.
+CI compiles the G4, G5, and G6 LaTeX dossiers and runs the G5/G6 suites plus dedicated G8.4 role, model, trajectory, predictive, compositional, and multi-step workflows on pushes and pull requests.
 
 ## Research freeze rule
 
