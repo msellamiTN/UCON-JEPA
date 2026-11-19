@@ -258,11 +258,32 @@ def _evaluate_split(models: dict[str, Any], split: dict[str, np.ndarray], temper
     result = {}
     for name, model in models.items():
         p = model.predict_proba(x, prev) if name == "first_order_markov" else model.predict_proba(x)
-        result[name] = {"raw": _metrics(p, y)}
+        result[name] = {"raw": _metrics(p, y), "by_policy_family": {}}
+        for policy in sorted(set(split["agent_policy"].tolist())):
+            for family in sorted(set(split["family"].tolist())):
+                mask = (split["agent_policy"] == policy) & (split["family"] == family)
+                if not np.any(mask):
+                    continue
+                key = f"{policy}/{family}"
+                result[name]["by_policy_family"][key] = _metrics(p[mask], y[mask])
         if name == "past_only_softmax":
-            result[name]["calibrated"] = _metrics(_softmax(np.log(np.clip(p, EPS, 1.0)) / temperature), y)
+            calibrated = _softmax(np.log(np.clip(p, EPS, 1.0)) / temperature)
+            result[name]["calibrated"] = _metrics(calibrated, y)
+            result[name]["calibrated_by_policy_family"] = {}
+            for key, mask in _stratum_masks(split).items():
+                result[name]["calibrated_by_policy_family"][key] = _metrics(calibrated[mask], y[mask])
             result[name]["temperature"] = temperature
     return result
+
+
+def _stratum_masks(split: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    masks = {}
+    for policy in sorted(set(split["agent_policy"].tolist())):
+        for family in sorted(set(split["family"].tolist())):
+            mask = (split["agent_policy"] == policy) & (split["family"] == family)
+            if np.any(mask):
+                masks[f"{policy}/{family}"] = mask
+    return masks
 
 
 def run_experiment(dataset: dict[str, Any]) -> dict[str, Any]:
