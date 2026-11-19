@@ -162,6 +162,36 @@ def build_policy_dataset(seed: int = 20261120, episodes_per_family_policy: int =
             f"{policy}/{family}": sum(1 for eid in ids if episode_policy[eid] == (family, policy))
             for policy in AGENT_POLICIES for family in FAMILIES
         }
+    behavior_stats = {}
+    for policy in AGENT_POLICIES:
+        for family in FAMILIES:
+            subset = [r for r in rows if r["agent_policy"] == policy and r["family"] == family]
+            by_episode = {}
+            for row in subset:
+                by_episode.setdefault(row["episode_id"], []).append(row)
+            repeated_after_deny = 0
+            changed_after_deny = 0
+            unique_action_counts = []
+            for episode_rows in by_episode.values():
+                episode_rows.sort(key=lambda x: x["step"])
+                unique_action_counts.append(len({r["action_name"] for r in episode_rows}))
+                for previous, current in zip(episode_rows, episode_rows[1:]):
+                    if previous["security"][0] == 1.0:
+                        if current["action_name"] == previous["action_name"]:
+                            repeated_after_deny += 1
+                        else:
+                            changed_after_deny += 1
+            denied = sum(int(r["security"][0]) for r in subset)
+            behavior_stats[f"{policy}/{family}"] = {
+                "episodes": len(by_episode),
+                "transitions": len(subset),
+                "denied_transitions": denied,
+                "denial_rate": denied / len(subset) if subset else None,
+                "repeated_same_action_after_deny": repeated_after_deny,
+                "changed_action_after_deny": changed_after_deny,
+                "mean_unique_actions_per_episode": float(np.mean(unique_action_counts)) if unique_action_counts else None,
+            }
+
     output["manifest"] = {
         "benchmark": "G8.4.7 fixed-length policy-conditioned stateful UCON trajectories",
         "seed": seed,
@@ -180,6 +210,7 @@ def build_policy_dataset(seed: int = 20261120, episodes_per_family_policy: int =
                            for p in ("train", "validation", "test")},
         "row_counts": {p: len(output[p]["context"]) for p in ("train", "validation", "test")},
         "episodes_by_policy_family": policy_counts,
+        "policy_behavior_stats": behavior_stats,
         "fixed_length_check": "every episode has exactly episode_length rows; denied actions do not truncate episodes",
         "denial_semantics": "protected workflow state is unchanged; attempt history and denial feedback are observed; agent continues",
         "limitations": [
