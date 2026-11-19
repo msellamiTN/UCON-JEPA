@@ -289,7 +289,67 @@ def _stratum_masks(split: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return masks
 
 
-def run_experiment(dataset: dict[str, Any]) -> dict[str, Any]:
+def _episode_metric_matrix(prob: np.ndarray, action: np.ndarray, episode_id: np.ndarray) -> tuple[list[str], np.ndarray]:
+    """Return one metric vector per whole episode; never resample transitions."""
+    y = np.argmax(action, axis=1)
+    order = np.argsort(-prob, axis=1)
+    onehot = np.zeros_like(prob)
+    onehot[np.arange(len(y)), y] = 1.0
+    rows = np.column_stack((
+        -np.log(np.clip(prob[np.arange(len(y)), y], EPS, 1.0)),
+        (order[:, 0] == y).astype(float),
+        np.any(order[:, :2] == y[:, None], axis=1).astype(float),
+        np.square(prob - onehot).sum(axis=1),
+    ))
+    groups: dict[str, list[int]] = {}
+    for i, eid in enumerate(episode_id.tolist()):
+        groups.setdefault(str(eid), []).append(i)
+    ids = sorted(groups)
+    episode_values = np.stack([rows[groups[eid]].mean(axis=0) for eid in ids])
+    return ids, episode_values
+
+
+def _paired_episode_bootstrap(
+    softmax_prob: np.ndarray,
+    baseline_prob: np.ndarray,
+    action: np.ndarray,
+    episode_id: np.ndarray,
+    seed: int,
+    replicates: int = 1000,
+) -> dict[str, Any]:
+    """Paired percentile intervals for softmax-minus-baseline episode means."""
+    ids, softmax_values = _episode_metric_matrix(softmax_prob, action, episode_id)
+    baseline_ids, baseline_values = _episode_metric_matrix(baseline_prob, action, episode_id)
+    if ids != baseline_ids:
+        raise AssertionError("paired bootstrap methods do not share identical episodes")
+    difference = softmax_values - baseline_values
+    rng = np.random.default_rng(seed)
+    draws = rng.integers(0, len(ids), size=(replicates, len(ids)))
+    sampled = difference[draws].mean(axis=1)
+    names = ("nll", "top1_accuracy", "top2_accuracy", "multiclass_brier")
+    return {
+        "unit": "whole episode",
+        "episodes": len(ids),
+        "replicates": replicates,
+        "difference": "past_only_softmax minus baseline; negative is better for NLL/Brier, positive is better for accuracy",
+        "metrics": {
+            name: {
+                "mean_difference": float(difference[:, i].mean()),
+                "ci95_percentile": [
+                    float(np.quantile(sampled[:, i], 0.025)),
+                    float(np.quantile(sampled[:, i], 0.975)),
+                ],
+            }
+            for i, name in enumerate(names)
+        },
+    }
+
+
+def run_experiment(
+    dataset: dict[str, Any],
+    bootstrap_replicates: int = 0,
+    bootstrap_seed: int = 0,
+) -> dict[str, Any]:
     tr, va, ca, te = (dataset[k] for k in PARTITIONS)
     majority = MajorityActionPredictor().fit(tr["context"], tr["action"])
     history = HistoricalFrequencyPredictor().fit(tr["context"], tr["action"])
@@ -298,20 +358,41 @@ def run_experiment(dataset: dict[str, Any]) -> dict[str, Any]:
     models = {"majority": majority, "historical_frequency": history, "first_order_markov": markov, "past_only_softmax": supervised}
     calibration_p = supervised.predict_proba(ca["context"])
     temperature = _fit_temperature(calibration_p, ca["action"])
+    test_result = _evaluate_split(models, te, temperature)
+    if bootstrap_replicates:
+        prev = _previous_actions(te)
+        probabilities = {
+            name: (model.predict_proba(te["context"], prev) if name == "first_order_markov" else model.predict_proba(te["context"]))
+            for name, model in models.items()
+        }
+        test_result["paired_episode_bootstrap_softmax_minus_baseline"] = {
+            baseline: _paired_episode_bootstrap(
+                probabilities["past_only_softmax"], probabilities[baseline],
+                te["action"], te["episode_id"], bootstrap_seed + i, bootstrap_replicates,
+            )
+            for i, baseline in enumerate(("majority", "historical_frequency", "first_order_markov"))
+        }
     return {
         "validation_selected_epoch": supervised.best_epoch,
         "calibration_temperature": temperature,
-        "test": _evaluate_split(models, te, temperature),
+        "test": test_result,
         "validation": _evaluate_split(models, va, temperature),
         "calibration": _evaluate_split(models, ca, temperature),
     }
 
 
-def run_lopo(dataset: dict[str, Any]) -> dict[str, Any]:
+def run_lopo(
+    dataset: dict[str, Any],
+    bootstrap_replicates: int = 0,
+    bootstrap_seed: int = 0,
+) -> dict[str, Any]:
     folds = {}
-    for policy in AGENT_POLICIES:
+    for i, policy in enumerate(AGENT_POLICIES):
         fold = build_lopo_fold(dataset, policy)
-        folds[policy] = run_experiment(fold)
+        folds[policy] = run_experiment(
+            fold, bootstrap_replicates=bootstrap_replicates,
+            bootstrap_seed=bootstrap_seed + 100 + i * 10_000,
+        )
     return folds
 
 
