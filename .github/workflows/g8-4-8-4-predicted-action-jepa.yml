@@ -1,0 +1,36 @@
+name: G8.4.8.4 Predicted-Action JEPA
+
+on:
+  push:
+    branches:
+      - research/g8.4.8.4-predicted-action-jepa
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-4-predicted-action-jepa.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-4-predicted-action-jepa.yml"
+  workflow_dispatch:
+
+jobs:
+  predicted-action-jepa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run all G8.4 regression tests
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Execute three-seed E1/E2 JEPA rollouts
+        working-directory: experiments/G8.4
+        run: python uncertain_action_jepa.py --seeds 20261120,20261121,20261122 --episodes-per-family-policy 300 --epochs 180 --mc-samples 32 --bootstrap-replicates 1000 --out predicted-action-jepa-output
+      - name: Retain E1/E2 results and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-4-predicted-action-jepa
+          path: experiments/G8.4/predicted-action-jepa-output/
