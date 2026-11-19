@@ -29,10 +29,13 @@ jobs:
       - name: Generate five-policy dataset and LOPO folds
         working-directory: experiments/G8.4
         run: python uncertain_action_dataset.py --seed 20261120 --episodes-per-family-policy 300 --episode-length 8 --out uncertain-action-output
-      - name: Retain dataset and LOPO manifests
+      - name: Checksum every generated dataset partition
+        working-directory: experiments/G8.4
+        run: |
+          find uncertain-action-output -type f -name '*.npz' -print0 | sort -z | xargs -0 sha256sum > uncertain-action-output/SHA256SUMS.txt
+          test -s uncertain-action-output/SHA256SUMS.txt
+      - name: Retain complete dataset, LOPO folds and checksums
         uses: actions/upload-artifact@v4
         with:
           name: g8-4-8-2-uncertain-action-dataset
-          path: |
-            experiments/G8.4/uncertain-action-output/manifest.json
-            experiments/G8.4/uncertain-action-output/lopo/**/manifest.json
+          path: experiments/G8.4/uncertain-action-output/
