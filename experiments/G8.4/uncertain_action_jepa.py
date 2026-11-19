@@ -265,6 +265,22 @@ def _episode_bootstrap_difference(
     }
 
 
+def _episode_loss_table(
+    episode_ids: np.ndarray,
+    risk_brier: np.ndarray,
+    security_mse: np.ndarray,
+) -> list[dict[str, Any]]:
+    rows = []
+    for episode_id in sorted(set(episode_ids.tolist())):
+        mask = episode_ids == episode_id
+        rows.append({
+            "episode_id": str(episode_id),
+            "risk_brier": float(risk_brier[mask].mean()),
+            "security_mse": float(security_mse[mask].mean()),
+        })
+    return rows
+
+
 def evaluate_horizon(
     model: LinearActionConditionedJEPA,
     action_model: PastOnlySoftmaxPredictor,
@@ -337,6 +353,14 @@ def evaluate_horizon(
             ),
             "security_mse": _episode_bootstrap_difference(
                 e2_security_loss, e1_security_loss, windows["episode_id"], seed + 2, bootstrap_replicates
+            ),
+        },
+        "episode_losses": {
+            "E1_known_action_privileged": _episode_loss_table(
+                windows["episode_id"], e1_risk_loss, e1_security_loss
+            ),
+            "E2_predicted_action": _episode_loss_table(
+                windows["episode_id"], e2_risk_loss, e2_security_loss
             ),
         },
     }
