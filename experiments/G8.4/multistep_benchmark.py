@@ -13,7 +13,7 @@ import argparse, json
 from pathlib import Path
 import numpy as np
 
-from jepa_numpy import JEPAConfig, LinearActionConditionedJEPA
+from jepa_numpy import JEPAConfig, LinearActionConditionedJEPA, LinearActionConditionedSupervised
 from predictive_benchmark import metrics, ridge_fit, ridge_predict, scaler, transform
 from stateful_trajectory_dataset import build_dataset, FAMILIES
 
@@ -95,6 +95,19 @@ def _fit_jepa(train, context_scaler, future_scaler, action_scaler, seed, epochs)
     return model
 
 
+
+def _fit_supervised(train, context_scaler, action_scaler, seed, epochs):
+    xc = transform(train["context"], context_scaler)
+    xa = transform(train["actions"], action_scaler)
+    cfg = JEPAConfig(latent_dim=12, learning_rate=.008, epochs=epochs, batch_size=64,
+                     ema_tau=.99, variance_floor=.2, variance_weight=.1,
+                     security_weight=.5, seed=seed)
+    model = LinearActionConditionedSupervised(
+        xc.shape[1], xa.shape[1], train["security"].shape[1], cfg
+    )
+    model.fit(xc, xa, train["security"])
+    return model
+
 def _score(method_predictions, test, horizon):
     truth = test["security"]
     results = {}
@@ -121,6 +134,7 @@ def evaluate_seed(seed, episodes_per_family, epochs):
     dataset = build_dataset(seed=seed, episodes_per_family=episodes_per_family, episode_length=8)
     by_horizon = {}
     one_step_model = None
+    one_step_supervised_model = None
     one_step_context_scaler = None
     one_step_action_scaler = None
     for horizon in HORIZONS:
@@ -137,16 +151,22 @@ def evaluate_seed(seed, episodes_per_family, epochs):
         at = transform(test["actions"], ap)
         model = _fit_jepa(train, cp, fp, ap, seed + horizon, epochs)
         direct_jepa = np.clip(model.decode_security(model.predict_latent(xt, at)), 0, 1)
+        direct_supervised_model = _fit_supervised(train, cp, ap, seed + 10000 + horizon, epochs)
         direct_supervised = np.clip(
+            direct_supervised_model.decode_security(direct_supervised_model.predict_latent(xt, at)), 0, 1
+        )
+        direct_ridge = np.clip(
             ridge_predict(ridge_fit(np.column_stack((xc, xa)), train["security"]),
                           np.column_stack((xt, at))), 0, 1
         )
         predictions = {
             "direct_horizon_jepa": direct_jepa,
-            "direct_horizon_supervised": direct_supervised,
+            "direct_horizon_supervised_matched": direct_supervised,
+            "direct_horizon_supervised_ridge": direct_ridge,
         }
         if horizon == 1:
             one_step_model = model
+            one_step_supervised_model = direct_supervised_model
             one_step_context_scaler = cp
             one_step_action_scaler = ap
         # Validation is kept separate and reported; it is not used to tune the
@@ -162,8 +182,9 @@ def evaluate_seed(seed, episodes_per_family, epochs):
             "episodes": int(len(set(validation["episode_id"].tolist()))),
         }
         if horizon == 1:
-            # Preserve the one-step model and its own preprocessing for rollout.
+            # Preserve both one-step models and their own preprocessing for rollout.
             one_step_model = model
+            one_step_supervised_model = direct_supervised_model
             one_step_context_scaler = cp
             one_step_action_scaler = ap
         else:
@@ -175,7 +196,11 @@ def evaluate_seed(seed, episodes_per_family, epochs):
             ).reshape(raw_actions.shape)
             rollout_context = transform(test["context"], one_step_context_scaler)
             recursive = _predict_recursive(one_step_model, rollout_context, rollout_actions)
+            recursive_supervised = _predict_recursive(
+                one_step_supervised_model, rollout_context, rollout_actions
+            )
             predictions["recursive_one_step_jepa"] = recursive
+            predictions["recursive_one_step_supervised_matched"] = recursive_supervised
         by_horizon[str(horizon)] = {
             "train_windows": int(len(train["context"])),
             "validation_windows": int(len(validation["context"])),
@@ -217,44 +242,61 @@ def aggregate_runs(runs, bootstrap_replicates=2000):
                     "std_across_seeds": float(np.std(vals, ddof=1)) if len(vals) > 1 else None,
                     "seed_count": len(vals),
                 }
-        # Paired cluster bootstrap: one mean loss per episode; preserve pairing
-        # between JEPA and supervised predictions when resampling episodes.
+        # Paired, seed-stratified cluster bootstrap: preserve the seed composition
+        # and resample whole episodes within each seed. This avoids treating seed
+        # variation as if it were additional episode-level sampling variation.
         pooled = {}
-        for method in ("direct_horizon_jepa", "direct_horizon_supervised", "recursive_one_step_jepa"):
-            errors = {}
+        for method in ("direct_horizon_jepa", "direct_horizon_supervised_matched",
+                       "direct_horizon_supervised_ridge", "recursive_one_step_jepa",
+                       "recursive_one_step_supervised_matched"):
+            by_seed = {}
             for run in runs:
                 entry = run["horizons"][horizon]["methods"].get(method)
                 if entry is None:
                     continue
-                for row in entry["episode_errors"]:
-                    errors[(run["seed"], row["episode_id"])] = row
-            pooled[method] = errors
+                by_seed[run["seed"]] = {row["episode_id"]: row for row in entry["episode_errors"]}
+            pooled[method] = by_seed
         comparisons = {}
-        for candidate in ("direct_horizon_jepa", "recursive_one_step_jepa"):
-            if candidate not in pooled or not pooled[candidate] or not pooled["direct_horizon_supervised"]:
+        pairs = (
+            ("direct_horizon_jepa", "direct_horizon_supervised_matched"),
+            ("recursive_one_step_jepa", "recursive_one_step_supervised_matched"),
+            ("direct_horizon_jepa", "direct_horizon_supervised_ridge"),
+        )
+        for candidate, comparator in pairs:
+            if not pooled.get(candidate) or not pooled.get(comparator):
                 continue
-            common = sorted(set(pooled[candidate]) & set(pooled["direct_horizon_supervised"]))
-            brier_delta = np.asarray([
-                pooled[candidate][key]["brier"] - pooled["direct_horizon_supervised"][key]["brier"]
-                for key in common
-            ])
-            mse_delta = np.asarray([
-                pooled[candidate][key]["security_mse"] - pooled["direct_horizon_supervised"][key]["security_mse"]
-                for key in common
-            ])
-            if len(common) < 2:
+            seed_groups = {}
+            for seed in sorted(set(pooled[candidate]) & set(pooled[comparator])):
+                common = sorted(set(pooled[candidate][seed]) & set(pooled[comparator][seed]))
+                if common:
+                    seed_groups[seed] = (
+                        np.asarray([pooled[candidate][seed][eid]["brier"] -
+                                    pooled[comparator][seed][eid]["brier"] for eid in common]),
+                        np.asarray([pooled[candidate][seed][eid]["security_mse"] -
+                                    pooled[comparator][seed][eid]["security_mse"] for eid in common]),
+                    )
+            if not seed_groups:
                 continue
-            def ci(values):
-                samples = rng.integers(0, len(values), size=(bootstrap_replicates, len(values)))
-                means = values[samples].mean(axis=1)
-                return [float(np.quantile(means, .025)), float(np.quantile(means, .975))]
-            comparisons[candidate + "_minus_supervised"] = {
-                "episode_clusters": len(common),
-                "brier_difference_mean": float(brier_delta.mean()),
-                "brier_difference_95pct_cluster_bootstrap_ci": ci(brier_delta),
-                "security_mse_difference_mean": float(mse_delta.mean()),
-                "security_mse_difference_95pct_cluster_bootstrap_ci": ci(mse_delta),
-                "interpretation": "positive difference favours supervised; negative favours candidate",
+            def ci(groups, index):
+                samples = np.empty(bootstrap_replicates, dtype=float)
+                for b in range(bootstrap_replicates):
+                    seed_means = []
+                    for seed in sorted(groups):
+                        values = groups[seed][index]
+                        draw = rng.integers(0, len(values), size=len(values))
+                        seed_means.append(float(values[draw].mean()))
+                    samples[b] = float(np.mean(seed_means))
+                return [float(np.quantile(samples, .025)), float(np.quantile(samples, .975))]
+            brier_mean = float(np.mean([v[0].mean() for v in seed_groups.values()]))
+            mse_mean = float(np.mean([v[1].mean() for v in seed_groups.values()]))
+            comparisons[candidate + "_minus_" + comparator] = {
+                "episode_clusters": int(sum(len(v[0]) for v in seed_groups.values())),
+                "seed_strata": {str(seed): len(values[0]) for seed, values in seed_groups.items()},
+                "brier_difference_mean_equal_seed_weight": brier_mean,
+                "brier_difference_95pct_seed_stratified_cluster_bootstrap_ci": ci(seed_groups, 0),
+                "security_mse_difference_mean_equal_seed_weight": mse_mean,
+                "security_mse_difference_95pct_seed_stratified_cluster_bootstrap_ci": ci(seed_groups, 1),
+                "interpretation": "positive difference favours comparator; negative favours candidate",
             }
         output[horizon]["paired_episode_bootstrap"] = comparisons
     return output
@@ -278,7 +320,9 @@ def main():
             "violation": "any policy-oracle violation within the next h transitions",
             "terminal_state": "approved, sensitive_read and role_granted after transition h",
             "direct": "one horizon-specific model predicts the terminal target",
-            "recursive": "one-step JEPA predictor rolled forward in latent space; cumulative risk is 1-product(1-step risk)",
+            "recursive": "one-step model rolled forward in latent space; cumulative risk is 1-product(1-step risk)",
+            "capacity_matched_control": "same linear context/action/predictor/decoder dimensions and training schedule; direct security-feature supervision without EMA latent target loss",
+            "additional_reference": "ridge regression using the same context/action-sequence inputs and security targets",
         },
         "split": "episode-disjoint train/validation/test inherited from stateful_trajectory_dataset",
         "per_seed": runs,
