@@ -38,6 +38,13 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G8.4.5 | experiments/G8.4/G8.4.5_RESULTS.md | Three held-out action compositions evaluated; supervised context+action baseline outperformed JEPA on principal metrics |
 | G8.4.6 | experiments/G8.4/G8.4.6_RESULTS.md | Direct and recursive horizons 1/2/4/8; capacity-matched controls and seed-stratified paired episode bootstrap; qualified recursive-rollout result, no absolute long-horizon security utility claim |
 | G8.4.7 | experiments/G8.4/G8.4.7_RESULTS.md | Fixed-length policy-conditioned trajectories after DENY; goal-directed, uniform and retrying-adversary behavior policies; episode-disjoint splits and oracle/gate checks passed; predictive evaluation remains open |
+| G8.4.8.1 | docs/research/G8.4.8_EXPERIMENT_PROTOCOL.md | Uncertain-action forecasting protocol: privileged known-action diagnostic, past-only predicted-action sequence, joint action/state latent prediction, reactive UCON baseline, and LOPO evaluation |
+| G8.4.8.2 | experiments/G8.4/uncertain_action_dataset.py | Fixed-length post-DENY dataset with five synthetic behavior policies, episode-disjoint partitions, five LOPO folds, and retained/checksummed artifacts |
+| G8.4.8.3 | experiments/G8.4/G8.4.8.3_RESULTS.md | Past-only action forecasting: four baselines, calibration, per-policy/family metrics; in-policy results positive, LOPO generalization not supported |
+| G8.4.8.3.1 | experiments/G8.4/G8.4.8.3.1_RESULTS.md | Five-seed validation and paired whole-episode bootstrap; historical-frequency baseline wins LOPO macro metrics |
+| G8.4.8.4 | experiments/G8.4/G8.4.8.4_RESULTS.md | E1 privileged known-action vs E2 predicted-action JEPA; three seeds and horizons 1/2/4/8; current E2 long-horizon discrimination near chance |
+| G8.4.8.5 | experiments/G8.4/G8.4.8.5_RESULTS.md | Joint action/state JEPA with auxiliary action loss; short-horizon E2 improves over post-hoc latent head, horizon-8 risk discrimination remains unresolved |
+| G8.4.8.6 | experiments/G8.4/ | Planned: LOPO evaluation of joint action/state JEPA and long-horizon uncertainty/drift analysis; not yet executed |
 
 ## Critical statistical boundary
 
