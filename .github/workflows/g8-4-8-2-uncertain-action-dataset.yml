@@ -1,0 +1,41 @@
+name: G8.4.8.2 Uncertain-Action Dataset
+
+on:
+  push:
+    branches:
+      - research/g8.4.8.2-policy-dataset
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-2-uncertain-action-dataset.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-2-uncertain-action-dataset.yml"
+  workflow_dispatch:
+
+jobs:
+  uncertain-action-dataset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run all G8.4 regression tests
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Generate five-policy dataset and LOPO folds
+        working-directory: experiments/G8.4
+        run: python uncertain_action_dataset.py --seed 20261120 --episodes-per-family-policy 300 --episode-length 8 --out uncertain-action-output
+      - name: Checksum every generated dataset partition
+        working-directory: experiments/G8.4
+        run: |
+          find uncertain-action-output -type f -name '*.npz' -print0 | sort -z | xargs -0 sha256sum > uncertain-action-output/SHA256SUMS.txt
+          test -s uncertain-action-output/SHA256SUMS.txt
+      - name: Retain complete dataset, LOPO folds and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-2-uncertain-action-dataset
+          path: experiments/G8.4/uncertain-action-output/
