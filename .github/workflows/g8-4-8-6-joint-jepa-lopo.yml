@@ -1,0 +1,36 @@
+name: G8.4.8.6 Joint JEPA LOPO
+
+on:
+  push:
+    branches:
+      - research/g8.4.8.6-joint-jepa-lopo
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-6-joint-jepa-lopo.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-6-joint-jepa-lopo.yml"
+  workflow_dispatch:
+
+jobs:
+  joint-jepa-lopo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run all G8.4 regression tests
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Execute three-seed five-policy LOPO joint JEPA benchmark
+        working-directory: experiments/G8.4
+        run: python joint_action_state_lopo.py --seeds 20261120,20261121,20261122 --episodes-per-family-policy 300 --epochs 180 --action-weight 0.5 --mc-samples 32 --bootstrap-replicates 1000 --out joint-jepa-lopo-output
+      - name: Retain LOPO metrics and paired episode-bootstrap intervals
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-6-joint-jepa-lopo
+          path: experiments/G8.4/joint-jepa-lopo-output/
