@@ -157,6 +157,18 @@ class LinearActionConditionedJEPA:
             raise ValueError("context and action batch lengths differ")
         return np.concatenate((xc @ self.W_context, xa @ self.W_action), axis=1) @ self.W_predictor
 
+    def predict_from_latents(self, context_latent, action_latent):
+        """One-step latent transition used for explicit autoregressive rollout.
+
+        Both arguments are already encoded. This method does not re-encode a
+        predicted latent as an observation and does not access future targets.
+        """
+        zc = self._matrix(context_latent, "context_latent", self.config.latent_dim)
+        za = self._matrix(action_latent, "action_latent", self.config.latent_dim)
+        if len(zc) != len(za):
+            raise ValueError("context and action latent batch lengths differ")
+        return np.concatenate((zc, za), axis=1) @ self.W_predictor
+
     def decode_security(self, predicted_latent):
         z = self._matrix(predicted_latent, "predicted_latent", self.config.latent_dim)
         return z @ self.W_decoder
