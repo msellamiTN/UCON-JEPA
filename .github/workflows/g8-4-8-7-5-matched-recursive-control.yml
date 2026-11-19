@@ -1,0 +1,39 @@
+name: G8.4.8.7.5 Matched Recursive Supervised Control
+
+on:
+  push:
+    branches:
+      - research/g8.4.8.7.5-matched-recursive-control
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-7-5-matched-recursive-control.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-7-5-matched-recursive-control.yml"
+  workflow_dispatch:
+
+jobs:
+  matched-recursive-control:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run all G8.4 regression tests
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Run focused matched recursive control tests
+        working-directory: experiments/G8.4
+        run: python -m unittest -v test_policy_shift_matched_recursive_control.py
+      - name: Execute five-seed matched recursive benchmark
+        working-directory: experiments/G8.4
+        run: python policy_shift_matched_recursive_control.py --seeds 20261120,20261121,20261122,20261123,20261124 --episodes-per-cell 300 --epochs 180 --mc-samples 32 --bootstrap-replicates 2000 --out matched-recursive-control-output
+      - name: Retain datasets, calibration, subgroup metrics and bootstrap intervals
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-7-5-matched-recursive-control
+          path: experiments/G8.4/matched-recursive-control-output/
