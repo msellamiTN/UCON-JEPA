@@ -37,6 +37,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G8.4.4 | experiments/G8.4/predictive_benchmark.py | Initial action-conditioned JEPA vs same-input supervised and ablation benchmark; synthetic baseline evidence recorded |
 | G8.4.5 | experiments/G8.4/G8.4.5_RESULTS.md | Three held-out action compositions evaluated; supervised context+action baseline outperformed JEPA on principal metrics |
 | G8.4.6 | experiments/G8.4/G8.4.6_RESULTS.md | Direct and recursive horizons 1/2/4/8; capacity-matched controls and seed-stratified paired episode bootstrap; qualified recursive-rollout result, no absolute long-horizon security utility claim |
+| G8.4.7 | experiments/G8.4/G8.4.7_RESULTS.md | Fixed-length policy-conditioned trajectories after DENY; goal-directed, uniform and retrying-adversary behavior policies; episode-disjoint splits and oracle/gate checks passed; predictive evaluation remains open |
 
 ## Critical statistical boundary
 
@@ -58,7 +59,7 @@ No empirical result is claimed until the corresponding experiment is implemented
     paper/formal/        G4, G5, and G6 LaTeX assurance dossiers
     formal/tla/          TLA+ runtime-enforcement model and TLC configurations
     tests/G6/            Executable abstract runtime contract tests
-    experiments/G5/      risk-control code, tests, results\n    experiments/G8.4/    JEPA role contract, NumPy model, stateful trajectories, and predictive benchmarks
+    experiments/G5/      risk-control code, tests, results\n    experiments/G8.4/    JEPA role contract, NumPy model, stateful and policy-conditioned trajectories, and predictive benchmarks
     .github/workflows/   automated validation
 
 ## Reproducibility
