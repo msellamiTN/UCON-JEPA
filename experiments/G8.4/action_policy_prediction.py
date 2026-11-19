@@ -197,7 +197,7 @@ class PastOnlySoftmaxPredictor:
 def _softmax(logits: np.ndarray) -> np.ndarray:
     z = np.asarray(logits, dtype=np.float64)
     z = z - np.max(z, axis=1, keepdims=True)
-    e = np.exp(np.clip(z, -700, 0))
+    e = np.exp(z)
     return _normalize_rows(e)
 
 
@@ -230,7 +230,7 @@ def _metrics(prob: np.ndarray, action: np.ndarray, top_k: int = 2) -> dict[str, 
 def _fit_temperature(prob: np.ndarray, action: np.ndarray) -> float:
     """Select scalar temperature on calibration only; no test labels are read."""
     y = np.argmax(action, axis=1)
-    logits = np.log(np.clip(prob, EPS, 1.0))
+    logits = np.where(prob > 0.0, np.log(np.maximum(prob, EPS)), -np.inf)
     best_t, best_loss = 1.0, float("inf")
     for temperature in np.linspace(0.5, 3.0, 51):
         p = _softmax(logits / temperature)
@@ -267,7 +267,10 @@ def _evaluate_split(models: dict[str, Any], split: dict[str, np.ndarray], temper
                 key = f"{policy}/{family}"
                 result[name]["by_policy_family"][key] = _metrics(p[mask], y[mask])
         if name == "past_only_softmax":
-            calibrated = _softmax(np.log(np.clip(p, EPS, 1.0)) / temperature)
+            calibrated_logits = np.where(p > 0.0, np.log(np.maximum(p, EPS)) / temperature, -np.inf)
+            calibrated = _softmax(calibrated_logits)
+            calibrated *= _allowed_mask(x)
+            calibrated = _normalize_rows(calibrated)
             result[name]["calibrated"] = _metrics(calibrated, y)
             result[name]["calibrated_by_policy_family"] = {}
             for key, mask in _stratum_masks(split).items():
