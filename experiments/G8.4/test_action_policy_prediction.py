@@ -88,6 +88,18 @@ class PastOnlyActionPredictionTests(unittest.TestCase):
         metrics = _metrics(p, te["action"])
         self.assertTrue({"nll", "top1_accuracy", "top2_accuracy", "multiclass_brier", "top_label_ece_10bin", "examples"} <= set(metrics))
 
+    def test_supervised_predictor_assigns_zero_mass_to_other_families(self):
+        tr, va, te = (self.ds[k] for k in ("train", "validation", "test"))
+        model = PastOnlySoftmaxPredictor(max_epochs=60, patience=8).fit(
+            tr["context"], tr["action"], va["context"], va["action"]
+        )
+        p = model.predict_proba(te["context"])
+        family = np.argmax(te["context"][:, :3], axis=1)
+        for family_index, allowed in enumerate(([0, 1, 2], [3, 4, 5], [6, 7, 8])):
+            rows = np.flatnonzero(family == family_index)
+            disallowed = sorted(set(range(9)) - set(allowed))
+            self.assertTrue(np.all(p[np.ix_(rows, disallowed)] == 0.0))
+
     def test_experiment_uses_distinct_calibration_partition(self):
         result = run_experiment(self.ds)
         self.assertIn("calibration_temperature", result)
