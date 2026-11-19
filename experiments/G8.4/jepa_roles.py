@@ -9,7 +9,38 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from math import isfinite
-from typing import Mapping, Sequence, Tuple
+from typing import Mapping, Protocol, Sequence, Tuple
+
+
+
+class ContextEncoder(Protocol):
+    """E_theta: encode past-only observation/action history."""
+    def encode_context(self, history: Mapping[str, object]) -> Latent: ...
+
+
+class ActionEncoder(Protocol):
+    """E_a: encode candidate action and current observable governance context."""
+    def encode_action(
+        self, candidate_action: Mapping[str, object],
+        current_governance_observation: Mapping[str, object],
+    ) -> Latent: ...
+
+
+class Predictor(Protocol):
+    """P_phi: predict a future latent from context + candidate action only."""
+    def predict(self, inputs: PredictorInput) -> Latent: ...
+
+
+class TargetEncoder(Protocol):
+    """E_bar_theta: encode realized future observation on the target branch."""
+    def encode_target(self, future_observation: Mapping[str, object]) -> Latent: ...
+
+
+class SecurityFeatureDecoder(Protocol):
+    """D_psi: decode explicit security-relevant estimates from predicted latent."""
+    def decode_security_features(
+        self, predicted_latent: Latent, horizon: int
+    ) -> "PredictedSecurityFeatures": ...
 
 
 Latent = Tuple[float, ...]
