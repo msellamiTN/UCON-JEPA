@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from multistep_benchmark import make_windows, _predict_recursive
-from jepa_numpy import JEPAConfig, LinearActionConditionedJEPA
+from jepa_numpy import JEPAConfig, LinearActionConditionedJEPA, LinearActionConditionedSupervised
 from stateful_trajectory_dataset import build_dataset
 
 class MultiStepBenchmarkTests(unittest.TestCase):
@@ -60,6 +60,22 @@ class MultiStepBenchmarkTests(unittest.TestCase):
         expected = model.predict_latent(context, action)
         actual = model.predict_from_latents(context @ model.W_context, action @ model.W_action)
         np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-12)
+
+
+    def test_capacity_matched_supervised_control_supports_rollout(self):
+        rng = np.random.default_rng(19)
+        cfg = JEPAConfig(latent_dim=4, epochs=3, batch_size=8, seed=19)
+        jepa = LinearActionConditionedJEPA(5, 3, 5, 4, cfg)
+        supervised = LinearActionConditionedSupervised(5, 3, 4, cfg)
+        self.assertEqual(jepa.parameter_count(), supervised.parameter_count())
+        x = rng.normal(size=(24, 5))
+        a = rng.normal(size=(24, 3))
+        y = rng.normal(size=(24, 5))
+        sec = rng.uniform(size=(24, 4))
+        supervised.fit(x, a, sec)
+        pred = _predict_recursive(supervised, x[:6], rng.normal(size=(6, 2, 3)))
+        self.assertEqual(pred.shape, (6, 4))
+        self.assertTrue(np.isfinite(pred).all())
 
     def test_incomplete_horizon_windows_are_not_created(self):
         ds = build_dataset(seed=412, episodes_per_family=100, episode_length=8)
