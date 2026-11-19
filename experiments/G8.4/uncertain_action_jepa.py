@@ -141,12 +141,21 @@ def fit_e1_e2_models(
     )
     calibration_prob = action_head.predict_proba(latent_features(calibration))
     temperature = _fit_temperature(calibration_prob, calibration["action"])
-    return jepa, action_head, {
+
+    # Diagnostic control only: this raw-context head is not used in E2 rollout,
+    # because future raw observations are unavailable at inference.
+    raw_action_head = PastOnlySoftmaxPredictor(max_epochs=250, patience=20).fit(
+        train["context"], train["action"], validation["context"], validation["action"],
+    )
+    raw_calibration_prob = raw_action_head.predict_proba(calibration["context"])
+    raw_temperature = _fit_temperature(raw_calibration_prob, calibration["action"])
+    return jepa, action_head, raw_action_head, {
         "context_scaler": context_scaler,
         "future_scaler": future_scaler,
         "action_scaler": action_scaler,
         "temperature": temperature,
         "action_head_selected_epoch": action_head.best_epoch,
+        "raw_context_temperature": raw_temperature,
     }
 
 
@@ -341,7 +350,7 @@ def run_seed(
     bootstrap_replicates: int = 1000,
 ) -> dict[str, Any]:
     dataset = build_dataset(seed, episodes_per_family_policy, episode_length=8)
-    model, action_model, scalers = fit_e1_e2_models(dataset, seed, epochs)
+    model, action_model, raw_action_model, scalers = fit_e1_e2_models(dataset, seed, epochs)
     test = dataset["test"]
     action_features = _action_features(
         _family_onehot(test["context"]),
@@ -351,6 +360,9 @@ def run_seed(
     action_logits = np.where(action_prob > 0.0, np.log(np.maximum(action_prob, EPS)) / scalers["temperature"], -np.inf)
     action_prob_cal = _softmax(action_logits)
     action_metrics = _metrics(action_prob_cal, test["action"])
+    raw_prob = raw_action_model.predict_proba(test["context"])
+    raw_logits = np.where(raw_prob > 0.0, np.log(np.maximum(raw_prob, EPS)) / scalers["raw_context_temperature"], -np.inf)
+    raw_metrics = _metrics(_softmax(raw_logits), test["action"])
     by_horizon = {}
     for horizon in (1, 2, 4, 8):
         by_horizon[str(horizon)] = evaluate_horizon(
@@ -361,9 +373,17 @@ def run_seed(
         "seed": seed,
         "dataset_manifest": dataset["manifest"],
         "action_model": {
-            "selected_epoch": action_model.best_epoch,
-            "temperature": scalers["temperature"],
-            "test_metrics": action_metrics,
+            "jepa_latent_head": {
+                "selected_epoch": action_model.best_epoch,
+                "temperature": scalers["temperature"],
+                "test_metrics": action_metrics,
+            },
+            "raw_context_diagnostic_only": {
+                "selected_epoch": raw_action_model.best_epoch,
+                "temperature": scalers["raw_context_temperature"],
+                "test_metrics": raw_metrics,
+                "inference_use": "not used in E2 because future raw context is unavailable",
+            },
         },
         "jepa": {
             "parameter_count": model.parameter_count(),
