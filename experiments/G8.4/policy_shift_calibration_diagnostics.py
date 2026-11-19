@@ -289,3 +289,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# Calibration is never selected against shifted or reverse test outcomes.
