@@ -49,6 +49,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G8.4.8.7.1 | docs/research/G8.4.8.7.1_DATASET_SMOKE_RESULTS.md | Parameterized five-archetype dataset; five-seed smoke generation, full G8.4 regressions, partition isolation and artifact checksums passed; full-scale model evaluation remains open |
 | G8.4.8.7.2 | docs/research/G8.4.8.7.2_ACTION_BASELINE_RESULTS.md | Five-seed full action baseline under rho=0.85 and reverse rho=0.05; past-only softmax wins pooled NLL/Brier but not every archetype; JEPA evaluation remains open |
 | G8.4.8.7.3 | docs/research/G8.4.8.7.3_JEPA_ACTION_RESULTS.md | Five-seed JEPA action representation benchmark passed; joint JEPA is near-tied with supervised context on rho=0.85 and does not beat it on pooled losses; post-hoc JEPA is weaker; recursive risk forecasting remains open |
+| G8.4.8.7.4 | docs/research/G8.4.8.7.4_RECURSIVE_RISK_RESULTS.md | Corrected five-seed recursive future-DENY benchmark passed (89 G8.4 tests + 4 focused tests); pooled E2 signal at H=2/4 vs prevalence, no JEPA superiority claim; subgroup heterogeneity and matched supervised recursive comparator remain open |
 
 ## Critical statistical boundary
 
