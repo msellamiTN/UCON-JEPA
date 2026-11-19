@@ -9,7 +9,8 @@ from typing import Any
 import numpy as np
 
 from action_policy_prediction import PastOnlySoftmaxPredictor, _fit_temperature
-from jepa_numpy import JEPAConfig, LinearActionConditionedSupervised
+from jepa_numpy import JEPAConfig
+from policy_shift_supervised_state_dynamics import LinearSupervisedStateDynamics
 from policy_parameter_dataset import build_dataset, write_dataset
 from policy_shift_recursive_risk import (
     EPS, HORIZONS, _apply_platt, _fit_platt, _group_metrics,
@@ -29,7 +30,7 @@ def _latent_features(model: Any, part: dict[str, np.ndarray],
 
 
 def _fit_supervised_action_head(
-    model: LinearActionConditionedSupervised,
+    model: LinearSupervisedStateDynamics,
     dataset: dict[str, Any],
     context_scaler: tuple[np.ndarray, np.ndarray],
 ) -> tuple[PastOnlySoftmaxPredictor, float]:
@@ -93,20 +94,22 @@ def _run_one_seed(
         dataset, seed=seed, epochs=epochs
     )
 
-    # Exact same latent dimensions, train rows, seed, optimizer settings,
-    # context/action scalers and security targets for the supervised control.
+    # Directly predict the next observable context, then re-encode that
+    # prediction into the same latent space used by the past-only action head.
+    # The smaller latent dimension keeps total capacity within 10% of JEPA.
     config = JEPAConfig(
-        latent_dim=12, learning_rate=0.008, epochs=epochs, batch_size=128,
+        latent_dim=8, learning_rate=0.008, epochs=epochs, batch_size=128,
         ema_tau=0.99, variance_floor=0.2, variance_weight=0.1,
         security_weight=0.5, seed=seed,
     )
     train = dataset["train"]
-    supervised = LinearActionConditionedSupervised(
+    supervised = LinearSupervisedStateDynamics(
         train["context"].shape[1], train["action"].shape[1],
         train["security"].shape[1], config,
     ).fit(
         _transform(train["context"], scalers["context_scaler"]),
         _transform(train["action"], scalers["action_scaler"]),
+        _transform(train["future"], scalers["context_scaler"]),
         train["security"],
     )
     supervised_action, supervised_temperature = _fit_supervised_action_head(
@@ -214,6 +217,7 @@ def _run_one_seed(
                 ),
                 "action_head_selected_epoch": jepa_action.best_epoch,
                 "action_temperature": float(scalers["temperature"]),
+                "latent_dim": jepa.config.latent_dim,
                 "latent_loss_final": float(jepa.history.latent_loss[-1]),
                 "security_loss_final": float(jepa.history.security_loss[-1]),
             },
@@ -222,11 +226,17 @@ def _run_one_seed(
                 "stored_parameter_count": supervised.parameter_count(),
                 "action_head_selected_epoch": supervised_action.best_epoch,
                 "action_temperature": supervised_temperature,
-                "security_loss_final": float(supervised.history[-1]),
+                "security_loss_final": float(supervised.history[-1]["security_mse"]),
+                "future_context_mse_final": float(supervised.history[-1]["future_mse"]),
+                "latent_dim": supervised.config.latent_dim,
             },
             "shared_training_budget": {
                 "epochs": epochs, "batch_size": 128, "learning_rate": 0.008,
-                "latent_dim": 12, "same_seed": seed,
+                "JEPA_latent_dim": 12, "supervised_latent_dim": 8,
+                "same_seed": seed,
+                "trainable_parameter_ratio_supervised_to_JEPA": (
+                    supervised.parameter_count() / jepa.parameter_count()
+                ),
             },
         },
         "risk_calibrators": {
@@ -307,7 +317,7 @@ def main() -> None:
         },
         "limitations": [
             "five synthetic behavior archetypes and one scalar within-archetype mixture parameter",
-            "supervised control is direct security-target regression in the same latent transition architecture, not an EMA/JEPA objective",
+            "supervised control directly predicts next observable context and security targets, then re-encodes predicted context for recursive rollout; it has no EMA target encoder",
             "E1 privileged known-action results are reported in G8.4.8.7.4 and are not a deployable comparator",
             "no real-agent transfer, intervention utility, or production authorization claim",
         ],
