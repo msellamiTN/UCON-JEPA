@@ -28,6 +28,12 @@ class PastOnlyActionPredictionTests(unittest.TestCase):
             self.assertTrue(np.all(np.isfinite(p)))
             np.testing.assert_allclose(p.sum(axis=1), 1.0, atol=1e-10)
             self.assertTrue(np.all(p >= 0.0))
+            family = np.argmax(self.ds["test"]["context"][:, :3], axis=1)
+            for family_index, name in enumerate(("iam", "data", "sod")):
+                rows = family == family_index
+                allowed = {"iam": [0, 1, 2], "data": [3, 4, 5], "sod": [6, 7, 8]}[name]
+                disallowed = sorted(set(range(9)) - set(allowed))
+                self.assertTrue(np.all(p[np.ix_(rows, disallowed)] == 0.0))
 
     def test_supervised_model_uses_context_only_and_validation_checkpoint(self):
         tr, va, te = (self.ds[k] for k in PARTITIONS if k in ("train", "validation", "test"))
