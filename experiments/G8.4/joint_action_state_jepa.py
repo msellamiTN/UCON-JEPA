@@ -119,14 +119,25 @@ def run_seed(
     joint_scalers["temperature"] = joint_temperature
 
     test = dataset["test"]
-    baseline_action_metrics = baseline_head.predict_proba(
+    baseline_prob = baseline_head.predict_proba(
         np.concatenate((
             _family_onehot(test["context"]),
             _transform(test["context"], scalers["context_scaler"]) @ baseline_model.W_context,
         ), axis=1)
     )
-    baseline_action_metrics = _metrics(baseline_action_metrics, test["action"])
-    raw_action_metrics = _metrics(raw_head.predict_proba(test["context"]), test["action"])
+    baseline_logits = np.where(
+        baseline_prob > 0.0,
+        np.log(np.maximum(baseline_prob, EPS)) / scalers["temperature"],
+        -np.inf,
+    )
+    baseline_action_metrics = _metrics(_softmax(baseline_logits), test["action"])
+    raw_prob = raw_head.predict_proba(test["context"])
+    raw_logits = np.where(
+        raw_prob > 0.0,
+        np.log(np.maximum(raw_prob, EPS)) / scalers["raw_context_temperature"],
+        -np.inf,
+    )
+    raw_action_metrics = _metrics(_softmax(raw_logits), test["action"])
     joint_action_metrics = _calibrated_joint_action_metrics(
         joint_model, dataset, scalers, joint_temperature
     )
