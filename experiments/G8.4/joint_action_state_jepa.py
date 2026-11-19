@@ -75,6 +75,35 @@ def _calibrated_joint_action_metrics(
     return _metrics(_softmax(logits), test["action"])
 
 
+def _paired_joint_vs_posthoc_bootstrap(
+    joint_rows: list[dict[str, Any]],
+    posthoc_rows: list[dict[str, Any]],
+    metric: str,
+    seed: int,
+    replicates: int,
+) -> dict[str, Any]:
+    joint = {row["episode_id"]: float(row[metric]) for row in joint_rows}
+    posthoc = {row["episode_id"]: float(row[metric]) for row in posthoc_rows}
+    episode_ids = sorted(set(joint) & set(posthoc))
+    if len(episode_ids) != len(joint) or len(episode_ids) != len(posthoc):
+        raise AssertionError("joint and post-hoc evaluations must use identical episode sets")
+    differences = np.asarray([joint[eid] - posthoc[eid] for eid in episode_ids])
+    rng = np.random.default_rng(seed)
+    draws = rng.integers(0, len(episode_ids), size=(replicates, len(episode_ids)))
+    means = differences[draws].mean(axis=1)
+    return {
+        "unit": "whole episode",
+        "episodes": len(episode_ids),
+        "replicates": replicates,
+        "joint_minus_posthoc_mean": float(differences.mean()),
+        "ci95_percentile": [
+            float(np.quantile(means, 0.025)),
+            float(np.quantile(means, 0.975)),
+        ],
+        "interpretation": "negative favours joint action/state JEPA",
+    }
+
+
 def _summary(runs: dict[str, Any]) -> dict[str, Any]:
     output = {}
     for horizon in HORIZONS:
@@ -162,6 +191,18 @@ def run_seed(
                 "E1_known_action_privileged": joint_eval["E1_known_action_privileged"],
                 "E2_predicted_action": joint_eval["E2_predicted_action"],
                 "paired_episode_bootstrap_E2_minus_E1": joint_eval["paired_episode_bootstrap_E2_minus_E1"],
+            },
+            "paired_episode_bootstrap_joint_E2_minus_posthoc_E2": {
+                "risk_brier": _paired_joint_vs_posthoc_bootstrap(
+                    joint_eval["episode_losses"]["E2_predicted_action"],
+                    baseline_eval["episode_losses"]["E2_predicted_action"],
+                    "risk_brier", seed + horizon * 1000 + 1, bootstrap_replicates,
+                ),
+                "security_mse": _paired_joint_vs_posthoc_bootstrap(
+                    joint_eval["episode_losses"]["E2_predicted_action"],
+                    baseline_eval["episode_losses"]["E2_predicted_action"],
+                    "security_mse", seed + horizon * 1000 + 2, bootstrap_replicates,
+                ),
             },
         }
     return {
