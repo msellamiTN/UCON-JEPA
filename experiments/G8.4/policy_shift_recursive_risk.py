@@ -152,8 +152,9 @@ def run_seed(seed: int, episodes_per_cell: int = 300, epochs: int = 180,
             truth, windows = pred["truth"], pred["windows"]
             e1 = _apply_platt(pred["e1_raw"], calibrators[horizon]["E1_known_action_privileged"])
             e2 = _apply_platt(pred["e2_raw"], calibrators[horizon]["E2_predicted_action"])
-            prevalence = float(dataset["train"]["security"][:, 0].mean())
-            baseline = np.full(len(truth), prevalence, dtype=np.float64)
+            train_windows = _make_windows(dataset["train"], horizon)
+            train_horizon_prevalence = float(train_windows["security"][:, :, 0].max(axis=1).mean())
+            baseline = np.full(len(truth), train_horizon_prevalence, dtype=np.float64)
             predictions = {"train_prevalence": baseline, "E1_known_action_privileged": e1,
                             "E2_predicted_action": e2}
             e1_loss, e2_loss = (e1 - truth) ** 2, (e2 - truth) ** 2
@@ -162,7 +163,7 @@ def run_seed(seed: int, episodes_per_cell: int = 300, epochs: int = 180,
                 "rho": sorted(set(float(x) for x in dataset[split_name]["rho"].tolist())),
                 "windows": int(len(truth)),
                 "episodes": int(len(set(windows["episode_id"].tolist()))),
-                "prevalence": float(truth.mean()),
+                "prevalence": float(truth.mean()),\n                "train_horizon_prevalence": train_horizon_prevalence,
                 "metrics": {name: binary_metrics(truth, p) for name, p in predictions.items()},
                 "E2_uncertainty": {
                     "mean_mc_standard_deviation": float(pred["e2_std"].mean()),
