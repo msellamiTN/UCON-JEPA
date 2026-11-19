@@ -23,7 +23,8 @@ class PolicyShiftJEPAActionTests(unittest.TestCase):
             )
             self.assertEqual(set(split["calibrated_metrics"]), set(MODEL_NAMES))
             self.assertEqual(set(split["paired_episode_bootstrap"]), {
-                "raw_context_diagnostic", "posthoc_jepa_latent", "joint_action_state_jepa"
+                "majority", "first_order_markov",
+                "raw_context_diagnostic", "joint_action_state_jepa"
             })
             for model in MODEL_NAMES:
                 for metric in ("nll", "top1_accuracy", "top2_accuracy",
