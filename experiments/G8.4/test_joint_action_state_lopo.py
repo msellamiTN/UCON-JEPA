@@ -15,7 +15,7 @@ class JointActionStateLOPOTests(unittest.TestCase):
 
     def test_small_lopo_execution_preserves_fold_identity(self):
         result = run_seed(
-            seed=20261120, episodes_per_family_policy=30, epochs=2,
+            seed=20261120, episodes_per_family_policy=60, epochs=2,
             action_weight=0.5, mc_samples=4, bootstrap_replicates=100,
         )
         self.assertEqual(set(result["lopo"]), set(AGENT_POLICIES))
