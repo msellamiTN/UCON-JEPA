@@ -44,7 +44,9 @@ def _allowed_mask(context: np.ndarray) -> np.ndarray:
     fam = _family_index(context)
     mask = np.zeros((len(fam), ACTION_DIM), dtype=bool)
     for i, name in enumerate(FAMILY_ORDER):
-        mask[fam == i, [ACTION_TO_INDEX[a] for a in FAMILY_ACTIONS[name]]] = True
+        rows = np.flatnonzero(fam == i)
+        cols = [ACTION_TO_INDEX[a] for a in FAMILY_ACTIONS[name]]
+        mask[np.ix_(rows, cols)] = True
     return mask
 
 
