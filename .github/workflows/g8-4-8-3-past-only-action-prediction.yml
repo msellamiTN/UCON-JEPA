@@ -1,0 +1,36 @@
+name: G8.4.8.3 Past-Only Action Prediction
+
+on:
+  push:
+    branches:
+      - research/g8.4.8.3-past-only-action-prediction
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-3-past-only-action-prediction.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-3-past-only-action-prediction.yml"
+  workflow_dispatch:
+
+jobs:
+  past-only-action-prediction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run all G8.4 regression tests
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Execute in-policy and five-fold LOPO action forecasting
+        working-directory: experiments/G8.4
+        run: python action_policy_prediction.py --seed 20261120 --episodes-per-family-policy 300 --episode-length 8 --out action-prediction-output
+      - name: Retain prediction metrics and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-3-action-prediction-results
+          path: experiments/G8.4/action-prediction-output/
