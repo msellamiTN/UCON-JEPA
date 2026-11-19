@@ -217,8 +217,8 @@ class LinearActionConditionedSupervised:
             raise ValueError("aligned arrays with at least two rows are required")
         rng = np.random.default_rng(self.config.seed)
         for _ in range(self.config.epochs):
+            order = rng.permutation(len(xc))
             for start in range(0, len(xc), self.config.batch_size):
-                order = rng.permutation(len(xc))
                 idx = order[start:start + self.config.batch_size]
                 xb, ab, sb = xc[idx], xa[idx], ys[idx]
                 joined = np.concatenate((xb @ self.W_context, ab @ self.W_action), axis=1)
