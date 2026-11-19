@@ -58,6 +58,9 @@ def _fit_platt_nonnegative(scores: np.ndarray, labels: np.ndarray) -> dict[str, 
         for _ in range(40):
             candidate = beta - factor * step
             candidate[1] = max(0.0, candidate[1])
+            if np.allclose(candidate, beta, rtol=0.0, atol=1e-12):
+                accepted = True
+                break
             value = objective(candidate)
             if np.isfinite(value) and value <= current + 1e-10:
                 beta, current, accepted = candidate, value, True
