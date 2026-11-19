@@ -27,9 +27,9 @@ FAMILY_ACTIONS = {
     "data": ("read_sensitive", "export_sensitive", "data_list"),
     "sod": ("request", "approve", "pay"),
 }
-# Family indicators + seven policy-context features + four workflow flags
+# Family indicators + eight policy-context features + four workflow flags
 # + nine action-history counts + one violation flag.
-CONTEXT_DIM = 3 + 7 + 4 + len(ACTION_VOCAB) + 1
+CONTEXT_DIM = 3 + 8 + 4 + len(ACTION_VOCAB) + 1
 ACTION_DIM = len(ACTION_VOCAB)
 SECURITY_DIM = 4
 
