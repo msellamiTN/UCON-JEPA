@@ -184,3 +184,82 @@ class LinearActionConditionedJEPA:
     def parameter_count(self):
         return int(sum(x.size for x in (self.W_context, self.W_action,
                                         self.W_predictor, self.W_decoder)))
+
+
+class LinearActionConditionedSupervised:
+    """Capacity-matched direct-supervision control for the linear JEPA.
+
+    It uses the same context/action encoders, latent predictor and security
+    decoder dimensions as LinearActionConditionedJEPA, but optimizes only the
+    security-feature objective. It has no EMA target branch or latent-prediction
+    loss. This isolates the value of JEPA's predictive representation objective
+    from the benefit of the shared linear architecture and input conditioning.
+    """
+
+    def __init__(self, context_dim: int, action_dim: int, security_dim: int,
+                 config: JEPAConfig = JEPAConfig()):
+        if min(context_dim, action_dim, security_dim) < 1:
+            raise ValueError("all feature dimensions must be positive")
+        self.config = config
+        rng = np.random.default_rng(config.seed)
+        scale = 1.0 / np.sqrt(config.latent_dim)
+        self.W_context = rng.normal(0, scale, (context_dim, config.latent_dim))
+        self.W_action = rng.normal(0, scale, (action_dim, config.latent_dim))
+        self.W_predictor = rng.normal(0, scale, (2 * config.latent_dim, config.latent_dim))
+        self.W_decoder = rng.normal(0, scale, (config.latent_dim, security_dim))
+        self.history: list[float] = []
+
+    def fit(self, context, action, security_targets):
+        xc = LinearActionConditionedJEPA._matrix(context, "context")
+        xa = LinearActionConditionedJEPA._matrix(action, "action")
+        ys = LinearActionConditionedJEPA._matrix(security_targets, "security_targets")
+        if len(xc) != len(xa) or len(xc) != len(ys) or len(xc) < 2:
+            raise ValueError("aligned arrays with at least two rows are required")
+        rng = np.random.default_rng(self.config.seed)
+        for _ in range(self.config.epochs):
+            for start in range(0, len(xc), self.config.batch_size):
+                order = rng.permutation(len(xc))
+                idx = order[start:start + self.config.batch_size]
+                xb, ab, sb = xc[idx], xa[idx], ys[idx]
+                joined = np.concatenate((xb @ self.W_context, ab @ self.W_action), axis=1)
+                latent = joined @ self.W_predictor
+                decoded = latent @ self.W_decoder
+                residual = decoded - sb
+                loss = float(np.mean(residual ** 2))
+                grad_decoded = 2.0 * residual / residual.size
+                grad_decoder = latent.T @ grad_decoded
+                grad_latent = grad_decoded @ self.W_decoder.T
+                grad_predictor = joined.T @ grad_latent
+                grad_joined = grad_latent @ self.W_predictor.T
+                split = self.config.latent_dim
+                grad_context = xb.T @ grad_joined[:, :split]
+                grad_action = ab.T @ grad_joined[:, split:]
+                lr = self.config.learning_rate
+                self.W_decoder -= lr * grad_decoder
+                self.W_predictor -= lr * grad_predictor
+                self.W_context -= lr * grad_context
+                self.W_action -= lr * grad_action
+                self.history.append(loss)
+        return self
+
+    def predict_latent(self, context, action):
+        xc = LinearActionConditionedJEPA._matrix(context, "context")
+        xa = LinearActionConditionedJEPA._matrix(action, "action")
+        if len(xc) != len(xa):
+            raise ValueError("context and action batch lengths differ")
+        return np.concatenate((xc @ self.W_context, xa @ self.W_action), axis=1) @ self.W_predictor
+
+    def predict_from_latents(self, context_latent, action_latent):
+        zc = LinearActionConditionedJEPA._matrix(context_latent, "context_latent", self.config.latent_dim)
+        za = LinearActionConditionedJEPA._matrix(action_latent, "action_latent", self.config.latent_dim)
+        if len(zc) != len(za):
+            raise ValueError("context and action latent batch lengths differ")
+        return np.concatenate((zc, za), axis=1) @ self.W_predictor
+
+    def decode_security(self, predicted_latent):
+        z = LinearActionConditionedJEPA._matrix(predicted_latent, "predicted_latent", self.config.latent_dim)
+        return z @ self.W_decoder
+
+    def parameter_count(self):
+        return int(sum(x.size for x in (self.W_context, self.W_action,
+                                        self.W_predictor, self.W_decoder)))
