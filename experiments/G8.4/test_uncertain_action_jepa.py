@@ -14,7 +14,7 @@ class PredictedActionJEPATests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.dataset = build_dataset(seed=20261120, episodes_per_family_policy=60, episode_length=8)
-        cls.model, cls.action_model, cls.scalers = fit_e1_e2_models(cls.dataset, seed=20261120, epochs=4)
+        cls.model, cls.action_model, cls.raw_action_model, cls.scalers = fit_e1_e2_models(cls.dataset, seed=20261120, epochs=4)
 
     def test_windows_are_episode_local_and_contiguous(self):
         for horizon in (1, 2, 4, 8):
