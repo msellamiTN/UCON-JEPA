@@ -143,9 +143,14 @@ class SQLiteEventProcessor:
         with sqlite3.connect(self.database) as connection:
             events = connection.execute("SELECT COUNT(*) FROM processed_events").fetchone()[0]
             evaluations = connection.execute("SELECT COUNT(*) FROM evaluations").fetchone()[0]
-            outbox = connection.execute("SELECT COUNT(*) FROM outbox").fetchone()[0]
-        return {
-            "processed_events": events,
-            "evaluations": evaluations,
-            "outbox": outbox,
-        }
+        return {"processed_events": events, "evaluations": evaluations}
+
+    def outbox_counts(self) -> dict:
+        with sqlite3.connect(self.database) as connection:
+            rows = connection.execute(
+                "SELECT status, COUNT(*) FROM outbox GROUP BY status"
+            ).fetchall()
+        counts = {"pending": 0, "inflight": 0, "delivered": 0}
+        counts.update({status: count for status, count in rows})
+        counts["total"] = sum(counts.values())
+        return counts
