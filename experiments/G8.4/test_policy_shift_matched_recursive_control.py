@@ -156,10 +156,12 @@ class MatchedRecursiveControlTests(unittest.TestCase):
             result["status"],
             "post-hoc sensitivity; pre-registered pooled episode bootstrap remains primary",
         )
-        with self.assertRaises(ValueError):
+        duplicate_episode_ids = episode_ids.copy()
+        duplicate_episode_ids[-1] = duplicate_episode_ids[0]
+        with self.assertRaisesRegex(ValueError, "one row per episode"):
             _stratified_paired_loss_bootstrap(
-                jepa_loss, supervised_loss, episode_ids[:-1],
-                archetypes[:-1], families[:-1], seed=7, replicates=10,
+                jepa_loss, supervised_loss, duplicate_episode_ids,
+                archetypes, families, seed=7, replicates=10,
             )
 
 
