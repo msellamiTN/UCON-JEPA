@@ -7,6 +7,7 @@ from jepa_numpy import JEPAConfig, LinearActionConditionedJEPA
 from policy_shift_supervised_state_dynamics import LinearSupervisedStateDynamics
 from policy_shift_matched_recursive_control import (
     _run_one_seed, _predict_e2, _decision_time_mask,
+    _stratified_paired_loss_bootstrap,
 )
 
 
@@ -123,6 +124,43 @@ class MatchedRecursiveControlTests(unittest.TestCase):
                 self.assertEqual(boot["unit"], "whole episode")
                 self.assertEqual(boot["replicates"], 100)
                 self.assertEqual(len(boot["ci95_percentile"]), 2)
+
+
+    def test_stratified_bootstrap_preserves_all_fifteen_fixed_cells(self):
+        archetypes = np.asarray([
+            policy for policy in (
+                "goal_directed", "uniform", "retrying_adversary",
+                "prerequisite_blind_planner", "denial_adaptive_explorer",
+            ) for _family in ("iam", "data", "sod") for _ in range(2)
+        ])
+        families = np.asarray([
+            family for _policy in range(5)
+            for family in ("iam", "data", "sod") for _ in range(2)
+        ])
+        episode_ids = np.asarray([f"episode-{i}" for i in range(30)])
+        jepa_loss = np.linspace(0.1, 0.4, 30)
+        supervised_loss = np.linspace(0.2, 0.3, 30)
+        result = _stratified_paired_loss_bootstrap(
+            jepa_loss, supervised_loss, episode_ids, archetypes, families,
+            seed=7, replicates=250,
+        )
+        self.assertEqual(result["strata"], 15)
+        self.assertEqual(result["episodes"], 30)
+        self.assertEqual(result["replicates"], 250)
+        self.assertEqual(set(result["episode_allocation"].values()), {2})
+        self.assertAlmostEqual(
+            result["e2_minus_e1_mean"],
+            float(np.mean(jepa_loss - supervised_loss)),
+        )
+        self.assertEqual(
+            result["status"],
+            "post-hoc sensitivity; pre-registered pooled episode bootstrap remains primary",
+        )
+        with self.assertRaises(ValueError):
+            _stratified_paired_loss_bootstrap(
+                jepa_loss, supervised_loss, episode_ids[:-1],
+                archetypes[:-1], families[:-1], seed=7, replicates=10,
+            )
 
 
 if __name__ == "__main__":
