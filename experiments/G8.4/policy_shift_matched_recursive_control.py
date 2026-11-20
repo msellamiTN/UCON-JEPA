@@ -88,6 +88,69 @@ def _decision_time_mask(windows: dict[str, np.ndarray]) -> np.ndarray:
     return mask
 
 
+def _stratified_paired_loss_bootstrap(
+    jepa_loss: np.ndarray,
+    supervised_loss: np.ndarray,
+    episode_ids: np.ndarray,
+    archetypes: np.ndarray,
+    families: np.ndarray,
+    seed: int,
+    replicates: int,
+) -> dict[str, Any]:
+    """Post-hoc sensitivity bootstrap preserving the fixed archetype/family allocation.
+
+    The pre-registered pooled whole-episode bootstrap remains the primary interval.
+    This sensitivity resamples episodes independently within each of the 15 fixed
+    behavior-archetype × security-family cells, retaining each cell's sample size.
+    """
+    jepa_loss = np.asarray(jepa_loss, dtype=np.float64)
+    supervised_loss = np.asarray(supervised_loss, dtype=np.float64)
+    episode_ids = np.asarray(episode_ids)
+    archetypes = np.asarray(archetypes)
+    families = np.asarray(families)
+    n = len(episode_ids)
+    if not (len(jepa_loss) == len(supervised_loss) == len(archetypes) == len(families) == n):
+        raise ValueError("losses, episode IDs, and strata must have equal lengths")
+    if n == 0 or len(set(episode_ids.tolist())) != n:
+        raise ValueError("stratified primary bootstrap requires one row per episode")
+    if replicates < 1:
+        raise ValueError("replicates must be positive")
+
+    grouped_indices: dict[tuple[str, str], list[int]] = {}
+    for index, (archetype, family) in enumerate(zip(archetypes, families)):
+        key = (str(archetype), str(family))
+        grouped_indices.setdefault(key, []).append(index)
+    if len(grouped_indices) != 15:
+        raise ValueError(f"expected 15 archetype/family strata, found {len(grouped_indices)}")
+
+    differences = jepa_loss - supervised_loss
+    rng = np.random.default_rng(seed)
+    bootstrap_means = np.zeros(replicates, dtype=np.float64)
+    allocation = {}
+    for key in sorted(grouped_indices):
+        indices = np.asarray(grouped_indices[key], dtype=np.int64)
+        values = differences[indices]
+        draws = rng.integers(0, len(values), size=(replicates, len(values)))
+        stratum_means = values[draws].mean(axis=1)
+        bootstrap_means += (len(indices) / n) * stratum_means
+        allocation[f"{key[0]}::{key[1]}"] = len(indices)
+
+    return {
+        "unit": "whole episode within fixed archetype/family stratum",
+        "strata": len(grouped_indices),
+        "episode_allocation": allocation,
+        "episodes": n,
+        "replicates": replicates,
+        "e2_minus_e1_mean": float(differences.mean()),
+        "ci95_percentile": [
+            float(np.quantile(bootstrap_means, 0.025)),
+            float(np.quantile(bootstrap_means, 0.975)),
+        ],
+        "negative_favours_JEPA": True,
+        "status": "post-hoc sensitivity; pre-registered pooled episode bootstrap remains primary",
+    }
+
+
 def _run_one_seed(
     seed: int,
     episodes_per_cell: int,
@@ -241,6 +304,17 @@ def _run_one_seed(
                         ),
                         "negative_favours_JEPA": True,
                     },
+                    "stratified_sensitivity_bootstrap_JEPA_minus_supervised_Brier": (
+                        _stratified_paired_loss_bootstrap(
+                            jepa_decision_loss, supervised_decision_loss,
+                            decision_episode_ids,
+                            decision_windows["agent_policy"],
+                            decision_windows["family"],
+                            seed + horizon * 2000
+                            + (0 if split_name == "test_shifted" else 1_800_000),
+                            bootstrap_replicates,
+                        )
+                    ),
                     "by_archetype_family": _group_metrics(
                         decision_windows, decision_truth, decision_predictions
                     ),
@@ -389,6 +463,8 @@ def main() -> None:
             "secondary_population": "all overlapping sliding windows; descriptive only",
             "primary_contrast": "decision-time JEPA_E2 minus supervised_E2 Brier; negative favours JEPA",
             "bootstrap_unit": "whole episode; exactly one primary window per episode",
+            "primary_bootstrap": "pre-registered pooled whole-episode bootstrap",
+            "sensitivity_bootstrap": "post-hoc within-archetype/family stratified whole-episode bootstrap preserving fixed 15-cell allocation",
             "bootstrap_replicates": args.bootstrap_replicates,
         },
         "limitations": [
