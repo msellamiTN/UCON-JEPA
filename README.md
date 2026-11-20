@@ -31,7 +31,8 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G6.3 | formal/tla/G6_RuntimeEnforcement.tla | Core finite-state TLA+ model encoded |
 | G6.4 | docs/verification/G6.4_TLC_RESULTS.md | Bounded TLC run passed; four negative-control mutants detected; refinement open |
 | G6.5 | docs/verification/G6.5_REFINEMENT_AND_TESTS.md | Refinement matrix specified; ten abstract runtime contract tests pass; production refinement open |
-| G6.6 | paper/formal/g6_runtime_assurance.tex | Full G6 assurance dossier passes three-pass CI and cross-reference checks; proof-premise revalidation pending |\n| G8.4.1 | docs/research/G8.4.1_JEPA_ROLE_CONTRACT.md | JEPA component roles, information boundaries, and UCON non-authority contract specified |
+| G6.6 | paper/formal/g6_runtime_assurance.tex | Full G6 assurance dossier passes three-pass CI and cross-reference checks; proof-premise revalidation pending |
+| G8.4.1 | docs/research/G8.4.1_JEPA_ROLE_CONTRACT.md | JEPA component roles, information boundaries, and UCON non-authority contract specified |
 | G8.4.2 | experiments/G8.4/jepa_numpy.py | Trainable linear JEPA reference with context/action encoders, predictor, EMA target encoder, anti-collapse variance term, and security decoder; high-capacity architecture remains open |
 | G8.4.3 | experiments/G8.4/stateful_trajectory_dataset.py | Stateful synthetic IAM, data-export, and SoD trajectories; episode-disjoint partitions and independent policy-oracle/online-gate cross-check |
 | G8.4.4 | experiments/G8.4/predictive_benchmark.py | Initial action-conditioned JEPA vs same-input supervised and ablation benchmark; synthetic baseline evidence recorded |
@@ -52,7 +53,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G8.4.8.7.4 | docs/research/G8.4.8.7.4_RECURSIVE_RISK_RESULTS.md | Corrected five-seed recursive future-DENY benchmark passed (89 G8.4 tests + 4 focused tests); pooled E2 signal at H=2/4 vs prevalence, no JEPA superiority claim; subgroup heterogeneity and matched supervised recursive comparator remain open |
 | G8.4.8.7.5 | docs/research/G8.4.8.7.5_MATCHED_RECURSIVE_CONTROL_RESULTS.md | Five-seed matched JEPA/supervised recursive benchmark and CI passed; no consistent JEPA advantage; original headline metrics pooled sliding windows despite start-step-0 calibration, so decision-time primary estimand is re-evaluated in G8.4.8.7.7 |
 | G8.4.8.7.6 | docs/research/G8.4.8.7.6_CALIBRATION_DIRECTION_DIAGNOSTICS.md | Five-seed diagnostics and full G8.4 CI passed; identified substantial start-step-0 vs all-sliding-window population mismatch and seed-20261122 H1 calibration inversion; no test-driven calibration tuning |
-| G8.4.8.7.7 | docs/research/G8.4.8.7.7_DECISION_TIME_EVALUATION_PROTOCOL.md | One start-step-0 forecast per episode is the primary estimand, matching calibration; sliding-window metrics retained as secondary; implementation committed, full validation pending |
+| G8.4.8.7.7 | [Protocol](docs/research/G8.4.8.7.7_DECISION_TIME_EVALUATION_PROTOCOL.md) / [Results](docs/research/G8.4.8.7.7_DECISION_TIME_EVALUATION_RESULTS.md) | Five-seed decision-time benchmark and G8.4 CI passed; one start-step-0 forecast per episode; mixed seed/subgroup results, no consistent JEPA advantage |
 
 ## Critical statistical boundary
 
@@ -74,7 +75,8 @@ No empirical result is claimed until the corresponding experiment is implemented
     paper/formal/        G4, G5, and G6 LaTeX assurance dossiers
     formal/tla/          TLA+ runtime-enforcement model and TLC configurations
     tests/G6/            Executable abstract runtime contract tests
-    experiments/G5/      risk-control code, tests, results\n    experiments/G8.4/    JEPA role contract, NumPy model, stateful and policy-conditioned trajectories, and predictive benchmarks
+    experiments/G5/      risk-control code, tests, results
+    experiments/G8.4/    JEPA role contract, NumPy model, stateful and policy-conditioned trajectories, and predictive benchmarks
     .github/workflows/   automated validation
 
 ## Reproducibility
