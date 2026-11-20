@@ -1,0 +1,39 @@
+name: G8.4.8.7.7 Decision-Time Matched Recursive Evaluation
+
+on:
+  push:
+    branches:
+      - research/g8.4.8.7.7-decision-time-matched-evaluation
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-7-7-decision-time-matched-evaluation.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-7-7-decision-time-matched-evaluation.yml"
+  workflow_dispatch:
+
+jobs:
+  decision-time-matched-evaluation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run complete G8.4 regression suite
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Run focused matched recursive decision-time tests
+        working-directory: experiments/G8.4
+        run: python -m unittest -v test_policy_shift_matched_recursive_control.py
+      - name: Execute five-seed decision-time matched benchmark
+        working-directory: experiments/G8.4
+        run: python policy_shift_matched_recursive_control.py --seeds 20261120,20261121,20261122,20261123,20261124 --episodes-per-cell 300 --epochs 180 --mc-samples 32 --bootstrap-replicates 2000 --out decision-time-matched-output
+      - name: Retain datasets, manifests, checksums, primary and secondary metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-7-7-decision-time-matched-evaluation
+          path: experiments/G8.4/decision-time-matched-output/
