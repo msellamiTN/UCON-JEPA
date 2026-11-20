@@ -149,7 +149,7 @@ class MatchedRecursiveControlTests(unittest.TestCase):
         self.assertEqual(result["replicates"], 250)
         self.assertEqual(set(result["episode_allocation"].values()), {2})
         self.assertAlmostEqual(
-            result["e2_minus_e1_mean"],
+            result["jepa_minus_supervised_mean"],
             float(np.mean(jepa_loss - supervised_loss)),
         )
         self.assertEqual(
