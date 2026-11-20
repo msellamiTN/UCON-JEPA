@@ -50,9 +50,9 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G8.4.8.7.2 | docs/research/G8.4.8.7.2_ACTION_BASELINE_RESULTS.md | Five-seed full action baseline under rho=0.85 and reverse rho=0.05; past-only softmax wins pooled NLL/Brier but not every archetype; JEPA evaluation remains open |
 | G8.4.8.7.3 | docs/research/G8.4.8.7.3_JEPA_ACTION_RESULTS.md | Five-seed JEPA action representation benchmark passed; joint JEPA is near-tied with supervised context on rho=0.85 and does not beat it on pooled losses; post-hoc JEPA is weaker; recursive risk forecasting remains open |
 | G8.4.8.7.4 | docs/research/G8.4.8.7.4_RECURSIVE_RISK_RESULTS.md | Corrected five-seed recursive future-DENY benchmark passed (89 G8.4 tests + 4 focused tests); pooled E2 signal at H=2/4 vs prevalence, no JEPA superiority claim; subgroup heterogeneity and matched supervised recursive comparator remain open |
-| G8.4.8.7.5 | docs/research/G8.4.8.7.5_MATCHED_RECURSIVE_CONTROL_RESULTS.md | Corrected five-seed JEPA vs supervised recursive control passed; no consistent JEPA advantage; supervised wins H=1/2, H=4/8 near-tied; seed-specific JEPA H=1 calibration inversion requires diagnosis |
-| G8.4.8.7.6 | docs/research/G8.4.8.7.6_CALIBRATION_DIRECTION_DIAGNOSTICS.md | Diagnose raw JEPA risk-score direction, nominal-only Platt calibration, recursive action/latent traces and seed-20261122 inversion; focused and five-seed validation pending |
-| G8.4.8.7.6 | docs/research/G8.4.8.7.6_CALIBRATION_DIRECTION_DIAGNOSTICS.md | Planned: isolate seed-20261122 JEPA risk-score/calibration-direction failure without test-driven calibration tuning |
+| G8.4.8.7.5 | docs/research/G8.4.8.7.5_MATCHED_RECURSIVE_CONTROL_RESULTS.md | Five-seed matched JEPA/supervised recursive benchmark and CI passed; no consistent JEPA advantage; original headline metrics pooled sliding windows despite start-step-0 calibration, so decision-time primary estimand is re-evaluated in G8.4.8.7.7 |
+| G8.4.8.7.6 | docs/research/G8.4.8.7.6_CALIBRATION_DIRECTION_DIAGNOSTICS.md | Five-seed diagnostics and full G8.4 CI passed; identified substantial start-step-0 vs all-sliding-window population mismatch and seed-20261122 H1 calibration inversion; no test-driven calibration tuning |
+| G8.4.8.7.7 | docs/research/G8.4.8.7.7_DECISION_TIME_EVALUATION_PROTOCOL.md | One start-step-0 forecast per episode is the primary estimand, matching calibration; sliding-window metrics retained as secondary; implementation committed, full validation pending |
 
 ## Critical statistical boundary
 
