@@ -141,7 +141,7 @@ def _stratified_paired_loss_bootstrap(
         "episode_allocation": allocation,
         "episodes": n,
         "replicates": replicates,
-        "e2_minus_e1_mean": float(differences.mean()),
+        "jepa_minus_supervised_mean": float(differences.mean()),
         "ci95_percentile": [
             float(np.quantile(bootstrap_means, 0.025)),
             float(np.quantile(bootstrap_means, 0.975)),
