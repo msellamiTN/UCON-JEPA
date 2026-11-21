@@ -42,6 +42,7 @@ class CapabilityOverlayTests(unittest.TestCase):
     def test_overlay_applies_to_exactly_two_decision_opportunities(self):
         overlay = CapabilityOverlay(manifest(), duration_decisions=2)
         self.assertTrue(overlay.trigger("JEPA risk threshold"))
+        self.assertEqual(overlay.trigger_reason, "JEPA risk threshold")
         self.assertEqual(overlay.remaining_decisions, 2)
 
         first = overlay.begin_decision()
