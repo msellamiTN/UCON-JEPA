@@ -238,7 +238,7 @@ def run_episode(
         records.append({
             "episode_id": episode_id, "step": step, "arm": arm,
             "original_action": original, "proposed_action": proposed,
-            "warning": bool(warning), "revised": bool(revised),
+            "warning": bool(warning), "eligible": bool(eligible), "revised": bool(revised),
             "risk_score": risk_score, "original_action_denied": bool(not original_allowed),
             "ucon_allowed": bool(gate_allowed),
             "denial_reason": gate_reason or "",
@@ -254,7 +254,10 @@ def run_episode(
     warning_true_positive = sum(
         row["warning"] and row["original_action_denied"] for row in records
     )
-    warning_positive = sum(row["original_action_denied"] for row in records)
+    warning_positive = sum(
+        row["eligible"] and row["original_action_denied"] for row in records
+    )
+    eligible_count = sum(row["eligible"] for row in records)
     distinct_actions = len(set(row["proposed_action"] for row in records))
     repeat_attempts = sum(
         records[i]["proposed_action"] == records[i - 1]["proposed_action"]
@@ -267,7 +270,8 @@ def run_episode(
         "denied_count": int(denied), "denied_rate": denied / EPISODE_LENGTH,
         "any_deny": bool(denied > 0),
         "task_complete": bool(_task_complete(family, state)),
-        "warning_count": int(warnings), "warning_rate": warnings / EPISODE_LENGTH,
+        "warning_count": int(warnings), "eligible_decisions": int(eligible_count),
+        "warning_rate": warnings / eligible_count,
         "revision_count": int(revisions),
         "warning_precision": (
             float(warning_true_positive / warnings) if warnings else None
