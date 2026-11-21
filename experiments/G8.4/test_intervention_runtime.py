@@ -37,6 +37,10 @@ class CapabilityManifestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             CapabilityManifest(frozenset({""}), frozenset(), frozenset())
 
+    def test_rejects_mutable_capability_collections(self):
+        with self.assertRaisesRegex(TypeError, "must be a frozenset"):
+            CapabilityManifest({"read"}, frozenset({"read"}), frozenset())
+
 
 class CapabilityOverlayTests(unittest.TestCase):
     def test_overlay_applies_to_exactly_two_decision_opportunities(self):
