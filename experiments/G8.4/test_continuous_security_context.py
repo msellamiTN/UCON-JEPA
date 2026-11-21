@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 
+from counterfactual_policy_world_model import empirical_residual_identity
 from continuous_security_context import (
     ACTIONS,
     exogenous_disturbance,
@@ -35,6 +36,28 @@ class ContinuousSecurityContextTests(unittest.TestCase):
             np.array([0.82, 0.30, 0.58]) + np.array([0.18, 0.22, 0.15]) * eps
         )
         np.testing.assert_allclose(observed, expected)
+
+    def test_residual_transport_is_exact_for_paired_additive_branches(self):
+        state = np.array([0.2, 0.3, 0.4])
+        factual, alternative = [], []
+        for index in range(512):
+            eps = exogenous_disturbance(29, f"additive-{index}", 0)
+            factual.append(transition(state, "read_sensitive", eps))
+            alternative.append(transition(state, "export_sensitive", eps))
+        result = empirical_residual_identity(np.asarray(factual), np.asarray(alternative))
+        self.assertLess(result["action_effect_variance"], 1e-25)
+        self.assertLess(result["residual_transport_mse"], 1e-25)
+
+    def test_residual_risk_identity_holds_in_action_scaled_regime(self):
+        state = np.array([0.2, 0.3, 0.4])
+        factual, alternative = [], []
+        for index in range(512):
+            eps = exogenous_disturbance(31, f"scaled-{index}", 0)
+            factual.append(transition(state, "read_sensitive", eps, interaction=0.3))
+            alternative.append(transition(state, "export_sensitive", eps, interaction=0.3))
+        result = empirical_residual_identity(np.asarray(factual), np.asarray(alternative))
+        self.assertGreater(result["action_effect_variance"], 0.0)
+        self.assertLess(result["absolute_identity_error"], 1e-12)
 
     def test_paired_branches_share_identical_environment_disturbance(self):
         state = np.array([0.2, 0.3, 0.4])
