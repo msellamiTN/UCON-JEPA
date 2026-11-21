@@ -164,54 +164,122 @@ def _power_for_n(n_per_arm_per_stratum: int, sigma2: float,
     )
 
 
+def _simulate_power(
+    n_per_arm_per_stratum: int,
+    residual_pools: list[np.ndarray],
+    sigma2: float,
+    *,
+    replicates: int,
+    seed: int,
+    batch_size: int = 128,
+) -> float:
+    """Empirical-residual Monte Carlo power for the blocked standardized ITT."""
+    n_strata = len(residual_pools)
+    if n_per_arm_per_stratum < 1 or n_strata < 1 or replicates < 100:
+        raise ValueError("invalid power simulation dimensions")
+    if sigma2 <= 1e-12:
+        raise RuntimeError("degenerate pilot residual variance; power is not estimable")
+    se = math.sqrt(2.0 * sigma2 / (n_per_arm_per_stratum * n_strata))
+    critical = NormalDist().inv_cdf(1.0 - POWER_ALPHA / 2.0)
+    rng = np.random.default_rng(seed + 1_000_003 * n_per_arm_per_stratum)
+    rejected = 0
+    completed = 0
+    while completed < replicates:
+        batch = min(batch_size, replicates - completed)
+        standardized_effect = np.zeros(batch, dtype=np.float64)
+        for pool in residual_pools:
+            control = rng.choice(pool, size=(batch, n_per_arm_per_stratum), replace=True).mean(axis=1)
+            treated = rng.choice(pool, size=(batch, n_per_arm_per_stratum), replace=True).mean(axis=1)
+            standardized_effect += treated - control
+        # Inject the fixed alternative after standardizing the stratum means.
+        z = (standardized_effect / n_strata - PRIMARY_MDE) / se
+        rejected += int(np.sum(np.abs(z) >= critical))
+        completed += batch
+    return float(rejected / replicates)
+
+
 def _power_gate(
     pilot: list[dict[str, Any]], max_per_arm: int,
+    *, replicates: int = 5000, seed: int = 884_808,
 ) -> dict[str, Any]:
-    # Estimate residual variance within each randomization stratum AND arm;
-    # treatment mean differences are excluded from the variance estimate.
-    grouped: dict[str, dict[str, list[float]]] = {}
+    # Residual pools are built within each nominal-rho × arm cell, then pooled
+    # over nominal rho to represent each fixed seed × archetype × family stratum.
+    grouped: dict[tuple[Any, ...], dict[str, list[float]]] = {}
     for row in pilot:
-        key = "|".join((
-            str(row["seed"]), str(row["archetype"]), str(row["family"]),
-            f'{float(row["rho"]):.2f}',
-        ))
-        grouped.setdefault(key, {}).setdefault(str(row["arm"]), []).append(
+        key = (
+            int(row["seed"]), str(row["archetype"]), str(row["family"]),
+            float(row["rho"]), str(row["arm"]),
+        )
+        grouped.setdefault(key, {}).setdefault("values", []).append(
             float(row["denied_rate"])
         )
-    residual_ss = 0.0
-    residual_df = 0
-    usable_strata = 0
-    for arm_groups in grouped.values():
-        stratum_n = 0
-        for values in arm_groups.values():
-            if len(values) > 1:
-                residual_ss += float(np.sum(np.square(
-                    np.asarray(values, dtype=np.float64) - np.mean(values)
-                )))
-                residual_df += len(values) - 1
-                stratum_n += len(values)
-        if stratum_n:
-            usable_strata += 1
-    if residual_df <= 0:
-        raise RuntimeError("power pilot did not provide within-arm residual variance")
-    sigma2 = residual_ss / residual_df
-    n_strata = 15 * len({int(row["seed"]) for row in pilot})
-    required = None
-    for n in range(1, max_per_arm + 1):
-        if _power_for_n(n, sigma2, n_strata=n_strata) >= POWER_TARGET:
-            required = n
+    residual_by_primary_stratum: dict[tuple[int, str, str], list[float]] = {}
+    for (seed_value, archetype, family, _rho, arm), entry in grouped.items():
+        values = np.asarray(entry["values"], dtype=np.float64)
+        if len(values) < 2:
+            raise RuntimeError("each pilot stratum × arm requires at least two episodes")
+        residuals = values - values.mean()
+        residual_by_primary_stratum.setdefault(
+            (seed_value, archetype, family), []
+        ).extend(residuals.tolist())
+    keys = sorted(residual_by_primary_stratum)
+    residual_pools = [
+        np.asarray(residual_by_primary_stratum[key], dtype=np.float64)
+        for key in keys
+    ]
+    if not residual_pools or any(len(pool) < 20 for pool in residual_pools):
+        raise RuntimeError("insufficient empirical residual support for power simulation")
+    sigma2 = float(np.mean([np.var(pool, ddof=1) for pool in residual_pools]))
+    if sigma2 <= 1e-12:
+        raise RuntimeError("degenerate pilot residual variance; power is not estimable")
+    n_strata = len(residual_pools)
+    if n_strata != 15 * len({int(row["seed"]) for row in pilot}):
+        raise AssertionError("pilot does not cover all 15 archetype × family cells per seed")
+
+    analytic_candidate = next(
+        (n for n in range(1, max_per_arm + 1)
+         if _power_for_n(n, sigma2, n_strata=n_strata) >= POWER_TARGET),
+        None,
+    )
+    power_at_maximum = _simulate_power(
+        max_per_arm, residual_pools, sigma2,
+        replicates=replicates, seed=seed + 17,
+    )
+    candidate = analytic_candidate if analytic_candidate is not None else max_per_arm
+    candidate_power = _simulate_power(
+        candidate, residual_pools, sigma2, replicates=replicates, seed=seed + 31,
+    )
+    while candidate_power < POWER_TARGET and candidate < max_per_arm:
+        candidate += 1
+        candidate_power = _simulate_power(
+            candidate, residual_pools, sigma2, replicates=replicates, seed=seed + 31,
+        )
+    while candidate > 1:
+        previous_power = _simulate_power(
+            candidate - 1, residual_pools, sigma2,
+            replicates=replicates, seed=seed + 31,
+        )
+        if previous_power < POWER_TARGET:
             break
+        candidate -= 1
+        candidate_power = previous_power
+
+    required = candidate if candidate_power >= POWER_TARGET else None
     selected = required if required is not None else max_per_arm
     return {
         "pilot_source": "independent nominal-rho pilot episodes; no shifted/reverse test outcomes",
         "pilot_episodes": len(pilot),
-        "pilot_strata": usable_strata,
-        "variance_estimator": "pooled within-randomization-stratum and within-arm residual variance",
-        "pooled_within_stratum_arm_variance": float(sigma2),
+        "pilot_strata": n_strata,
+        "variance_estimator": "empirical residual bootstrap, centered within nominal-rho × arm cells and pooled over nominal rho",
+        "pooled_within_stratum_arm_variance": sigma2,
         "minimum_detectable_effect": PRIMARY_MDE,
         "target_power": POWER_TARGET,
         "alpha_two_sided": POWER_ALPHA,
-        "power_at_maximum": _power_for_n(max_per_arm, sigma2, n_strata=n_strata),
+        "power_simulation_replicates": replicates,
+        "power_simulation_seed": seed,
+        "analytic_candidate_used_only_for_search_initialization": analytic_candidate,
+        "simulated_power_at_selected_n": float(candidate_power),
+        "simulated_power_at_maximum": float(power_at_maximum),
         "standardized_strata": n_strata,
         "required_episodes_per_arm_per_archetype_family_stratum": required,
         "selected_episodes_per_arm_per_stratum": selected,
@@ -439,6 +507,7 @@ def main() -> None:
     parser.add_argument("--pilot-episodes-per-stratum", type=int, default=40)
     parser.add_argument("--max-episodes-per-arm-per-stratum", type=int,
                         default=MAX_EPISODES_PER_ARM_PER_STRATUM)
+    parser.add_argument("--power-simulation-replicates", type=int, default=5000)
     parser.add_argument("--bootstrap-replicates", type=int, default=BOOTSTRAP_REPLICATES)
     parser.add_argument("--out", type=Path, default=Path("randomized-intervention-output"))
     args = parser.parse_args()
@@ -477,7 +546,10 @@ def main() -> None:
             seed, per_seed[seed]["score_functions"], thresholds_by_seed[seed],
             args.pilot_episodes_per_stratum,
         ))
-    power = _power_gate(pilot_rows, args.max_episodes_per_arm_per_stratum)
+    power = _power_gate(
+        pilot_rows, args.max_episodes_per_arm_per_stratum,
+        replicates=args.power_simulation_replicates, seed=884_808,
+    )
     n_primary = int(power["selected_episodes_per_arm_per_stratum"])
     n_secondary = min(40, n_primary)
 
