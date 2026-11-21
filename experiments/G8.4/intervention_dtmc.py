@@ -149,6 +149,56 @@ class DTMCRiskModel:
             for context, family in zip(partition["context"], partition["family"])
         ], dtype=np.float64)
 
+    def to_dict(self) -> dict[str, Any]:
+        if not self.fitted:
+            raise RuntimeError("DTMC model is not fitted")
+        serialized = []
+        for state, destinations in sorted(self.transitions.items()):
+            next_rows = []
+            for destination, count in sorted(
+                destinations.items(), key=lambda item: repr(item[0])
+            ):
+                if destination == DENY_STATE:
+                    next_key = {"type": "DENY"}
+                elif destination == SAFE_END_STATE:
+                    next_key = {"type": "SAFE_END"}
+                else:
+                    next_key = {"type": "STATE", "key": list(destination)}
+                next_rows.append({"destination": next_key, "count": int(count)})
+            serialized.append({"state": list(state), "transitions": next_rows})
+        return {
+            "alpha": self.alpha,
+            "global_deny_rate": self.global_deny_rate,
+            "family_deny_rate": self.family_deny_rate,
+            "transitions": serialized,
+            "metadata": self.metadata(),
+        }
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> "DTMCRiskModel":
+        model = cls(alpha=float(value["alpha"]))
+        model.global_deny_rate = float(value["global_deny_rate"])
+        model.family_deny_rate = {
+            str(key): float(rate) for key, rate in value["family_deny_rate"].items()
+        }
+        transitions = {}
+        for row in value["transitions"]:
+            state = tuple(int(item) for item in row["state"])
+            destinations = {}
+            for edge in row["transitions"]:
+                destination = edge["destination"]
+                if destination["type"] == "DENY":
+                    key = DENY_STATE
+                elif destination["type"] == "SAFE_END":
+                    key = SAFE_END_STATE
+                else:
+                    key = tuple(int(item) for item in destination["key"])
+                destinations[key] = int(edge["count"])
+            transitions[state] = destinations
+        model.transitions = transitions
+        model.fitted = True
+        return model
+
     def metadata(self) -> dict[str, Any]:
         if not self.fitted:
             raise RuntimeError("DTMC model is not fitted")
