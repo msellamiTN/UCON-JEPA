@@ -36,7 +36,9 @@ def _read_jsonl_gzip(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _pooled_blinded_covariance(rows: list[dict[str, Any]]) -> tuple[np.ndarray, int, int]:
+def _pooled_blinded_covariance(
+    rows: list[dict[str, Any]],
+) -> tuple[np.ndarray, int, int, list[tuple[np.ndarray, int]]]:
     cells: dict[tuple[str, str], list[tuple[float, float]]] = defaultdict(list)
     for row in rows:
         if row["arm"] not in ARMS:
@@ -47,16 +49,18 @@ def _pooled_blinded_covariance(rows: list[dict[str, Any]]) -> tuple[np.ndarray, 
     scatter = np.zeros((2, 2), dtype=np.float64)
     degrees = 0
     cell_count = 0
-    cell_sizes = []
+    cell_scatter: list[tuple[np.ndarray, int]] = []
     for values in cells.values():
         matrix = np.asarray(values, dtype=np.float64)
         if len(matrix) < 2:
             continue
         residual = matrix - matrix.mean(axis=0, keepdims=True)
-        scatter += residual.T @ residual
-        degrees += len(matrix) - 1
+        local_scatter = residual.T @ residual
+        local_df = len(matrix) - 1
+        scatter += local_scatter
+        degrees += local_df
         cell_count += 1
-        cell_sizes.append(len(matrix))
+        cell_scatter.append((local_scatter, local_df))
     if degrees <= 0:
         raise ValueError("pilot has insufficient within-block residual degrees of freedom")
     covariance = scatter / degrees
@@ -69,7 +73,40 @@ def _pooled_blinded_covariance(rows: list[dict[str, Any]]) -> tuple[np.ndarray, 
     minimum_eigenvalue = float(np.min(eigenvalues))
     repaired = np.maximum(eigenvalues, 1e-10)
     covariance = eigenvectors @ np.diag(repaired) @ eigenvectors.T
-    return covariance, degrees, cell_count
+    return covariance, degrees, cell_count, cell_scatter
+
+
+def _bootstrap_covariance_inflation(
+    cell_scatter: list[tuple[np.ndarray, int]],
+    pooled_covariance: np.ndarray,
+    *,
+    replicates: int,
+    seed: int,
+    quantile: float = 0.95,
+) -> tuple[float, float]:
+    if replicates < 100:
+        raise ValueError("at least 100 variance-bootstrap replicates are required")
+    if not cell_scatter:
+        raise ValueError("no pilot residual cells available for variance bootstrap")
+    rng = np.random.default_rng(seed)
+    cell_count = len(cell_scatter)
+    pooled_max_eigenvalue = float(np.max(np.linalg.eigvalsh(pooled_covariance)))
+    bootstrap_max_eigenvalues = np.empty(replicates, dtype=np.float64)
+    for replicate in range(replicates):
+        indices = rng.integers(0, cell_count, size=cell_count)
+        scatter = np.zeros((2, 2), dtype=np.float64)
+        degrees = 0
+        for index in indices:
+            local_scatter, local_df = cell_scatter[int(index)]
+            scatter += local_scatter
+            degrees += local_df
+        covariance = scatter / max(1, degrees)
+        bootstrap_max_eigenvalues[replicate] = max(
+            0.0, float(np.max(np.linalg.eigvalsh(covariance)))
+        )
+    upper = float(np.quantile(bootstrap_max_eigenvalues, quantile))
+    inflation = max(1.0, upper / max(pooled_max_eigenvalue, 1e-12))
+    return float(inflation), upper
 
 
 def _contrast_covariance_per_episode(
@@ -195,6 +232,7 @@ def plan_sample_size(
     alpha: float = 0.05,
     critical_replicates: int = 10000,
     power_replicates: int = 20000,
+    variance_bootstrap_replicates: int = 5000,
     seed: int = 884_808,
 ) -> dict[str, Any]:
     margins = {
@@ -273,17 +311,23 @@ def plan_sample_size(
     if any(count < 2 for count in block_sizes.values()):
         raise ValueError("each pilot block/arm cell needs at least two episodes")
 
-    covariance_outcomes, residual_df, cell_count = _pooled_blinded_covariance(rows)
+    covariance_outcomes, residual_df, cell_count, cell_scatter = _pooled_blinded_covariance(rows)
     expected_cells = expected_pilot_blocks * len(ARMS)
     if cell_count != expected_cells:
         raise ValueError(
             f"pilot is missing confirmatory arm/block cells: {cell_count} != {expected_cells}"
         )
+    variance_inflation, variance_upper_eigenvalue = _bootstrap_covariance_inflation(
+        cell_scatter, covariance_outcomes,
+        replicates=variance_bootstrap_replicates,
+        seed=seed + 404,
+    )
+    covariance_for_power = covariance_outcomes * variance_inflation
     block_count = (
         len(confirmatory_seeds) * ARCHETYPE_COUNT * FAMILY_COUNT * DIFFICULTY_COUNT
     )
     covariance_per_episode = _contrast_covariance_per_episode(
-        covariance_outcomes, block_count
+        covariance_for_power, block_count
     )
     correlation = _correlation_matrix(covariance_per_episode)
 
@@ -333,6 +377,15 @@ def plan_sample_size(
         "selected_joint_power": float(selected["joint_power_all_six_contrasts"]),
         "selected_max_t_critical": float(selected["max_t_critical_one_sided"]),
         "pilot_blinded_covariance": covariance_outcomes.tolist(),
+        "pilot_covariance_for_power": covariance_for_power.tolist(),
+        "variance_bootstrap": {
+            "replicates": int(variance_bootstrap_replicates),
+            "upper_quantile": 0.95,
+            "upper_max_eigenvalue": variance_upper_eigenvalue,
+            "pooled_max_eigenvalue": float(np.max(np.linalg.eigvalsh(covariance_outcomes))),
+            "inflation_factor": variance_inflation,
+            "interpretation": "one-sided 95% upper variance-scale bootstrap inflation; correlation structure retained",
+        },
         "pilot_residual_degrees_of_freedom": int(residual_df),
         "pilot_block_arm_cells": int(cell_count),
         "power_curve": power_curve,
@@ -362,6 +415,7 @@ def main() -> None:
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument("--critical-replicates", type=int, default=10000)
     parser.add_argument("--power-replicates", type=int, default=20000)
+    parser.add_argument("--variance-bootstrap-replicates", type=int, default=5000)
     parser.add_argument("--seed", type=int, default=884808)
     parser.add_argument("--out", default="intervention-power-output")
     args = parser.parse_args()
@@ -381,6 +435,7 @@ def main() -> None:
         alpha=args.alpha,
         critical_replicates=args.critical_replicates,
         power_replicates=args.power_replicates,
+        variance_bootstrap_replicates=args.variance_bootstrap_replicates,
         seed=args.seed,
     )
     output = Path(args.out)
