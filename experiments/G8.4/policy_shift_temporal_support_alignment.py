@@ -19,7 +19,7 @@ from policy_shift_matched_recursive_control import (
     _fit_supervised_action_head, _predict_e2,
 )
 from policy_shift_recursive_risk import (
-    HORIZONS, _apply_platt, _fit_platt, _group_metrics,
+    HORIZONS, _apply_platt, _fit_platt,
 )
 from policy_shift_supervised_state_dynamics import LinearSupervisedStateDynamics
 from predictive_benchmark import metrics as binary_metrics
@@ -65,6 +65,7 @@ def _safe_metrics(labels: np.ndarray, scores: np.ndarray) -> dict[str, Any]:
 
 def _fit_support_calibrators(
     raw: np.ndarray, truth: np.ndarray, positions: np.ndarray,
+    episode_ids: np.ndarray,
 ) -> dict[str, Any]:
     """Fit C0, CP and CA using calibration arrays only."""
     valid_positions = sorted(int(x) for x in np.unique(positions))
@@ -78,13 +79,13 @@ def _fit_support_calibrators(
             "scope": "position_0",
             "params": _fit_platt(raw[c0], truth[c0]),
             "calibration_windows": int(c0.sum()),
-            "calibration_episodes": None,
+            "calibration_episodes": int(len(set(episode_ids[c0].tolist()))),
         },
         "CA": {
             "scope": "all_valid_positions",
             "params": _fit_platt(raw, truth),
             "calibration_windows": int(len(raw)),
-            "calibration_episodes": None,
+            "calibration_episodes": int(len(set(episode_ids.tolist()))),
         },
         "CP": {"scope": "separate_per_position", "params_by_position": {}},
     }
@@ -97,6 +98,7 @@ def _fit_support_calibrators(
         result["CP"]["params_by_position"][str(position)] = {
             **_fit_platt(raw[mask], truth[mask]),
             "calibration_windows": int(mask.sum()),
+            "calibration_episodes": int(len(set(episode_ids[mask].tolist()))),
         }
     return result
 
@@ -118,14 +120,14 @@ def _apply_support_calibrators(
 
 def _per_position_report(
     truth: np.ndarray, raw: np.ndarray, positions: np.ndarray,
-    calibrated: dict[str, np.ndarray],
+    episode_ids: np.ndarray, calibrated: dict[str, np.ndarray],
 ) -> dict[str, Any]:
     report: dict[str, Any] = {}
     for position in sorted(int(x) for x in np.unique(positions)):
         mask = positions == position
         report[str(position)] = {
             "windows": int(mask.sum()),
-            "episodes": None,
+            "episodes": int(len(set(episode_ids[mask].tolist()))),
             "prevalence": float(truth[mask].mean()),
             "raw_score": _score_summary(raw[mask], truth[mask]),
             "raw_metrics": _safe_metrics(truth[mask], raw[mask]),
@@ -138,6 +140,23 @@ def _per_position_report(
             },
         }
     return report
+
+
+def _group_metrics_safe(
+    windows: dict[str, np.ndarray], truth: np.ndarray,
+    predictions: dict[str, np.ndarray],
+) -> dict[str, Any]:
+    output: dict[str, Any] = {}
+    for policy in sorted(set(windows["agent_policy"].tolist())):
+        output[policy] = {}
+        for family in sorted(set(windows["family"].tolist())):
+            mask = (windows["agent_policy"] == policy) & (windows["family"] == family)
+            if np.any(mask):
+                output[policy][family] = {
+                    name: _safe_metrics(truth[mask], pred[mask])
+                    for name, pred in predictions.items()
+                }
+    return output
 
 
 def _stratified_episode_bootstrap(
@@ -236,7 +255,8 @@ def _run_seed(
                 cal = cal_predictions[model_name]
                 cal_windows = cal["windows"]
                 cal_params = _fit_support_calibrators(
-                    cal["raw_risk"], cal["truth"], cal_windows["start_step"]
+                    cal["raw_risk"], cal["truth"], cal_windows["start_step"],
+                    cal_windows["episode_id"],
                 )
                 test = _predict_e2(
                     model, action_head, dataset[split_name], horizon,
@@ -274,10 +294,10 @@ def _run_seed(
                             for name, pred in calibrated.items()
                         },
                         "per_position": _per_position_report(
-                            truth, raw, windows["start_step"], calibrated
+                            truth, raw, windows["start_step"], windows["episode_id"], calibrated
                         ),
                         "by_archetype_family": {
-                            condition: _group_metrics(
+                            condition: _group_metrics_safe(
                                 windows, truth, {condition: calibrated[condition]}
                             )
                             for condition in ("C0", "CP", "CA")
