@@ -59,6 +59,10 @@ def _load_and_validate_trial(
     if power_report_sha != run_manifest.get("power_report_sha256"):
         raise ValueError("power report checksum does not match confirmatory run manifest")
     power_report = json.loads(power_report_path.read_text(encoding="utf-8"))
+    if power_report.get("source_sha") != run_manifest.get("source_sha"):
+        raise ValueError("power report and confirmatory run were produced from different source commits")
+    if power_report.get("pilot_source_sha") != power_report.get("source_sha"):
+        raise ValueError("pilot and power report source commits differ")
     if power_report.get("status") != "POWERED" or not power_report.get("confirmatory_generation_authorized"):
         raise ValueError("confirmatory trial references a non-authorizing power report")
     if abs(float(power_report.get("target_power", 0.0)) - 0.90) > 1e-12:
