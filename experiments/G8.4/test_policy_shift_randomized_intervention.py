@@ -1,9 +1,11 @@
 import tempfile
 import unittest
+
+import numpy as np
 from pathlib import Path
 
 from policy_shift_randomized_intervention import (
-    _analyze, _cohort_descriptives, _power_gate, _write_jsonl_gzip,
+    _analyze, _cohort_descriptives, _collect_arrays, _power_gate, _write_jsonl_gzip,
 )
 
 
@@ -50,6 +52,34 @@ class RandomizedInterventionAnalysisTests(unittest.TestCase):
         self.assertEqual(result["standardized_strata"], 75)
         self.assertLessEqual(result["selected_episodes_per_arm_per_stratum"], 40)
         self.assertEqual(result["minimum_detectable_effect"], 0.05)
+
+    def test_power_gate_rejects_degenerate_pilot_variance(self):
+        pilot = []
+        for seed in (1,):
+            for archetype in ("goal_directed", "uniform", "retrying_adversary",
+                              "prerequisite_blind_planner", "denial_adaptive_explorer"):
+                for family in ("iam", "data", "sod"):
+                    for rho in (0.2, 0.4, 0.6):
+                        for arm in ("ucon_only", "jepa_advisory",
+                                    "supervised_advisory", "random_advisory"):
+                            for i in range(4):
+                                pilot.append({
+                                    "seed": seed, "archetype": archetype,
+                                    "family": family, "rho": rho, "arm": arm,
+                                    "denied_rate": 0.25,
+                                })
+        with self.assertRaises(RuntimeError):
+            _power_gate(pilot, max_per_arm=20, replicates=100)
+
+    def test_checkpoint_array_collector_walks_model_and_scaler_dictionaries(self):
+        arrays = {}
+        _collect_arrays("root", {
+            "model": {"weights": np.ones((2, 3))},
+            "scaler": (np.zeros(3), np.ones(3)),
+        }, arrays)
+        self.assertIn("root_model_weights", arrays)
+        self.assertIn("root_scaler_0", arrays)
+        self.assertIn("root_scaler_1", arrays)
 
     def test_confirmatory_analysis_uses_episode_strata_and_returns_all_contrasts(self):
         result = _analyze(self._rows(), replicates=100, seed=77)
