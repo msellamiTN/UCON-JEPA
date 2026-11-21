@@ -167,33 +167,47 @@ def _power_for_n(n_per_arm_per_stratum: int, sigma2: float,
 def _power_gate(
     pilot: list[dict[str, Any]], max_per_arm: int,
 ) -> dict[str, Any]:
-    # Pooled within-stratum variance; treatment differences are not used to
-    # estimate the target effect. Strata include nominal rho and seed.
-    grouped: dict[str, list[float]] = {}
+    # Estimate residual variance within each randomization stratum AND arm;
+    # treatment mean differences are excluded from the variance estimate.
+    grouped: dict[str, dict[str, list[float]]] = {}
     for row in pilot:
         key = "|".join((
             str(row["seed"]), str(row["archetype"]), str(row["family"]),
             f'{float(row["rho"]):.2f}',
         ))
-        grouped.setdefault(key, []).append(float(row["denied_rate"]))
-    variances = [float(np.var(values, ddof=1)) for values in grouped.values() if len(values) > 1]
-    if not variances:
-        raise RuntimeError("power pilot did not provide within-stratum variance")
-    sigma2 = float(np.mean(variances))
-    required = None
-    achieved = None
+        grouped.setdefault(key, {}).setdefault(str(row["arm"]), []).append(
+            float(row["denied_rate"])
+        )
+    residual_ss = 0.0
+    residual_df = 0
+    usable_strata = 0
+    for arm_groups in grouped.values():
+        stratum_n = 0
+        for values in arm_groups.values():
+            if len(values) > 1:
+                residual_ss += float(np.sum(np.square(
+                    np.asarray(values, dtype=np.float64) - np.mean(values)
+                )))
+                residual_df += len(values) - 1
+                stratum_n += len(values)
+        if stratum_n:
+            usable_strata += 1
+    if residual_df <= 0:
+        raise RuntimeError("power pilot did not provide within-arm residual variance")
+    sigma2 = residual_ss / residual_df
     n_strata = 15 * len({int(row["seed"]) for row in pilot})
+    required = None
     for n in range(1, max_per_arm + 1):
-        achieved = _power_for_n(n, sigma2, n_strata=n_strata)
-        if achieved >= POWER_TARGET:
+        if _power_for_n(n, sigma2, n_strata=n_strata) >= POWER_TARGET:
             required = n
             break
     selected = required if required is not None else max_per_arm
     return {
         "pilot_source": "independent nominal-rho pilot episodes; no shifted/reverse test outcomes",
         "pilot_episodes": len(pilot),
-        "pilot_strata": len(variances),
-        "pooled_within_stratum_variance": sigma2,
+        "pilot_strata": usable_strata,
+        "variance_estimator": "pooled within-randomization-stratum and within-arm residual variance",
+        "pooled_within_stratum_arm_variance": float(sigma2),
         "minimum_detectable_effect": PRIMARY_MDE,
         "target_power": POWER_TARGET,
         "alpha_two_sided": POWER_ALPHA,
