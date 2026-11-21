@@ -59,7 +59,7 @@ class ContinuousSecurityContextTests(unittest.TestCase):
             self.assertEqual(first[action]["ucon_verdict"], second[action]["ucon_verdict"])
 
     def test_policy_boundary_is_recomputed_per_branch(self):
-        x = np.array([1.20, 0.2, 0.2])
+        x = np.array([1.30, 0.2, 0.2])
         self.assertEqual(policy_verdict("data", "data_list", x), "PERMIT")
         self.assertEqual(policy_verdict("data", "export_sensitive", x), "DENY")
         self.assertEqual(policy_verdict("data", "export_sensitive", x, base_policy_allowed=False), "DENY")
