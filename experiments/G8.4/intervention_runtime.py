@@ -41,6 +41,10 @@ class CapabilityManifest:
                 raise TypeError(f"{field_name} must be a frozenset")
             if any(not isinstance(value, str) or not value.strip() for value in values):
                 raise ValueError(f"{field_name} must contain non-empty strings")
+        if not self.base_capabilities:
+            raise ValueError("base_capabilities must not be empty")
+        if not self.restricted_capabilities:
+            raise ValueError("restricted_capabilities must not be empty for an intervention-eligible task")
         if not self.essential_capabilities <= self.base_capabilities:
             raise ValueError("essential capabilities must be a subset of base capabilities")
         if not self.restricted_capabilities <= self.base_capabilities:
