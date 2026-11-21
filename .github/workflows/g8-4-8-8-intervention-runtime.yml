@@ -13,6 +13,10 @@ on:
       - ".github/workflows/g8-4-8-8-intervention-runtime.yml"
   workflow_dispatch:
 
+concurrency:
+  group: g8-4-8-8-intervention-runtime-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   intervention-runtime-contract:
     runs-on: ubuntu-latest
