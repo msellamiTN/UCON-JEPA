@@ -23,11 +23,9 @@ class ResidualTransportTests(unittest.TestCase):
         alternative_action_effect = np.array([-2.5, 3.0])
         factual = factual_action_effect + disturbance
         alternative = alternative_action_effect + disturbance
-        prediction = residual_transport(
-            factual,
-            factual.mean(axis=0),
-            np.broadcast_to(alternative.mean(axis=0), factual.shape),
-        )
+        factual_mean = np.broadcast_to(factual.mean(axis=0), factual.shape)
+        alternative_mean = np.broadcast_to(alternative.mean(axis=0), factual.shape)
+        prediction = residual_transport(factual, factual_mean, alternative_mean)
         np.testing.assert_allclose(prediction, alternative, atol=1e-12, rtol=0)
 
     def test_empirical_residual_error_equals_action_effect_variance(self):
