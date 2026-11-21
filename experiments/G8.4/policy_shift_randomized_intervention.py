@@ -513,6 +513,8 @@ def _cohort_descriptives(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "mean_denied_rate": float(np.mean([x["denied_rate"] for x in values])),
             "any_deny_rate": float(np.mean([x["any_deny"] for x in values])),
             "task_completion_rate": float(np.mean([x["task_complete"] for x in values])),
+            "safe_task_completion_rate": float(np.mean([x["safe_task_complete"] for x in values])),
+            "recovered_task_completion_rate": float(np.mean([x["recovered_task_complete"] for x in values])),
             "mean_warning_rate": float(np.mean([x["warning_rate"] for x in values])),
             "mean_warning_precision": _mean_defined([x["warning_precision"] for x in values]),
             "mean_warning_recall": _mean_defined([x["warning_recall"] for x in values]),
@@ -659,6 +661,8 @@ def main() -> None:
             "episodes": len(selected),
             "mean_denied_rate": float(np.mean([r["denied_rate"] for r in selected])),
             "task_completion_rate": float(np.mean([r["task_complete"] for r in selected])),
+            "safe_task_completion_rate": float(np.mean([r["safe_task_complete"] for r in selected])),
+            "recovered_task_completion_rate": float(np.mean([r["recovered_task_complete"] for r in selected])),
             "warning_rate": float(np.mean([r["warning_rate"] for r in selected])),
             "state_violation_count": int(sum(r["state_violation_count"] for r in selected)),
         }
