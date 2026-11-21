@@ -42,13 +42,13 @@ def _spec(
 
 class EpisodeThresholdTests(unittest.TestCase):
     def test_episode_max_threshold_is_deterministic_and_records_tie_fraction(self):
-        values = [(f"e{i}", float(score)) for i, score in enumerate([0, 1, 1, 1, 2, 2, 2, 3, 4, 5])]
+        values = [(f"e{i}", float(score)) for i, score in enumerate([0, 1, 1, 1, 2, 2, 2, 3, 3, 3])]
         first = fit_episode_max_threshold(values, alert_fraction=0.2, tie_seed=77)
         second = fit_episode_max_threshold(values, alert_fraction=0.2, tie_seed=77)
         self.assertEqual(first, second)
         self.assertEqual(first["target_validation_alerts"], 2)
-        self.assertEqual(first["threshold"], 4.0)
-        self.assertEqual(first["tie_fraction"], 0.0)
+        self.assertEqual(first["threshold"], 3.0)
+        self.assertAlmostEqual(first["tie_fraction"], 2.0 / 3.0)
 
     def test_threshold_rejects_nonfinite_scores_and_duplicate_ids(self):
         with self.assertRaisesRegex(ValueError, "unique"):
