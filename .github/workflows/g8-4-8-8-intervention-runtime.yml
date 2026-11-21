@@ -40,4 +40,4 @@ jobs:
         run: python -m unittest discover -v
       - name: Run focused intervention runtime and simulator tests
         working-directory: experiments/G8.4
-        run: python -m unittest -v test_intervention_runtime test_intervention_task_manifests test_intervention_dtmc test_intervention_simulator test_intervention_power test_intervention_confirmatory
+        run: python -m unittest -v test_intervention_runtime test_intervention_task_manifests test_intervention_dtmc test_intervention_simulator test_intervention_power test_intervention_confirmatory test_intervention_analysis
