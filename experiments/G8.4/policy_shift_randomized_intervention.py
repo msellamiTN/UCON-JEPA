@@ -735,6 +735,7 @@ def main() -> None:
             "python": sys.version, "numpy": np.__version__,
             "platform": platform.platform(),
             "github_sha": os.environ.get("GITHUB_SHA"),
+            "ucon_jepa_head_sha": os.environ.get("UCON_JEPA_HEAD_SHA"),
         },
         "episode_unit": "one complete eight-transition synthetic episode",
     }
