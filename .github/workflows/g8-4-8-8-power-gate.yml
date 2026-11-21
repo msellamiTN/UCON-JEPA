@@ -1,0 +1,70 @@
+name: G8.4.8.8 Blinded-Pilot Max-t Power Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      pilot_run_id:
+        description: Completed GitHub Actions run ID containing the retained pilot artifact
+        required: true
+      delta_u:
+        description: Minimum DENY-burden superiority margin per episode
+        required: true
+      delta_js:
+        description: JEPA versus supervised DENY-burden non-inferiority margin
+        required: true
+      delta_l:
+        description: Task-completion non-inferiority margin (absolute probability)
+        required: true
+      target_u_effect:
+        description: Assumed JEPA DENY-burden reduction per episode under the planning alternative
+        required: true
+      target_js_effect:
+        description: Assumed JEPA-minus-supervised DENY-burden difference under the planning alternative
+        required: true
+      target_l_effect:
+        description: Assumed JEPA-minus-comparator task-completion difference under the planning alternative
+        required: true
+      confirmatory_seeds:
+        description: Five preregistered confirmatory seeds
+        required: true
+        default: "20261120,20261121,20261122,20261123,20261124"
+
+jobs:
+  max-t-power-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install experiment dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Download immutable pilot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: g8-4-8-8-intervention-pilot
+          path: pilot-artifact
+          run-id: ${{ inputs.pilot_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run six-contrast simultaneous max-t sample-size gate
+        working-directory: experiments/G8.4
+        run: |
+          python intervention_power.py \
+            --pilot '../../../pilot-artifact/episodes/pilot_episodes.jsonl.gz' \
+            --confirmatory-seeds '${{ inputs.confirmatory_seeds }}' \
+            --delta-u '${{ inputs.delta_u }}' \
+            --delta-js '${{ inputs.delta_js }}' \
+            --delta-l '${{ inputs.delta_l }}' \
+            --target-u-effect '${{ inputs.target_u_effect }}' \
+            --target-js-effect '${{ inputs.target_js_effect }}' \
+            --target-l-effect '${{ inputs.target_l_effect }}' \
+            --out intervention-power-output
+      - name: Retain max-t power report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-8-max-t-power-gate
+          path: experiments/G8.4/intervention-power-output/
