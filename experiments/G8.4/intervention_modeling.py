@@ -207,6 +207,7 @@ def fit_predictors(
 
     predictive_metrics = None
     if evaluate_holdout:
+        predictive_metrics = {}
         for partition_name in ("test_shifted", "test_reverse"):
             part = dataset[partition_name]
             test_windows = _make_windows(part, horizon=1)
