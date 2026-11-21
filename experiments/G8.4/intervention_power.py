@@ -10,6 +10,7 @@ import argparse
 import gzip
 import hashlib
 import json
+import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -282,8 +283,13 @@ def plan_sample_size(
 
     current_manifest_hashes = validate_task_manifests()
     pilot_summary_path = pilot_path.parent.parent / "pilot_summary.json"
+    pilot_source_sha = None
     if pilot_summary_path.exists():
         summary = json.loads(pilot_summary_path.read_text(encoding="utf-8"))
+        pilot_source_sha = summary.get("source_sha")
+        current_source_sha = os.environ.get("UCON_JEPA_HEAD_SHA", os.environ.get("GITHUB_SHA"))
+        if current_source_sha and pilot_source_sha != current_source_sha:
+            raise ValueError("pilot source SHA differs from the current power-gate source SHA")
         if summary.get("task_manifest_sha256") != current_manifest_hashes:
             raise ValueError("pilot task-manifest hashes do not match current frozen manifests")
         expected_episode_sha = summary.get("episode_records_sha256")
@@ -356,6 +362,8 @@ def plan_sample_size(
         "status": "POWERED" if powered else "UNDERPOWERED_AT_MAXIMUM",
         "pilot_file": str(pilot_path),
         "pilot_seeds": pilot_seeds,
+        "pilot_source_sha": pilot_source_sha,
+        "source_sha": os.environ.get("UCON_JEPA_HEAD_SHA", os.environ.get("GITHUB_SHA")),
         "confirmatory_seeds": list(confirmatory_seeds),
         "pilot_nominal_rhos": pilot_rhos,
         "task_manifest_sha256": current_manifest_hashes,
