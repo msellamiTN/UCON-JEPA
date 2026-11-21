@@ -4,6 +4,7 @@ import numpy as np
 
 from policy_shift_temporal_support_alignment import (
     _apply_support_calibrators,
+    _assert_episode_disjoint,
     _fit_support_calibrators,
     _safe_metrics,
     _stratified_episode_bootstrap,
@@ -88,6 +89,19 @@ class TemporalSupportAlignmentTests(unittest.TestCase):
             "uniform/data": 5,
         })
         self.assertEqual(result["replicates"], 200)
+
+    def test_episode_partitions_must_be_disjoint(self):
+        valid = {
+            "train": {"episode_id": np.asarray(["a", "b"])},
+            "validation": {"episode_id": np.asarray(["c"])},
+            "calibration": {"episode_id": np.asarray(["d"])},
+            "test_shifted": {"episode_id": np.asarray(["e"])},
+            "test_reverse": {"episode_id": np.asarray(["f"])},
+        }
+        _assert_episode_disjoint(valid)
+        valid["test_reverse"]["episode_id"] = np.asarray(["a"])
+        with self.assertRaisesRegex(AssertionError, "episode leakage"):
+            _assert_episode_disjoint(valid)
 
     def test_bootstrap_rejects_empty_strata(self):
         windows = {
