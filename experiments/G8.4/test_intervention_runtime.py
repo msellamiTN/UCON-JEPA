@@ -41,6 +41,12 @@ class CapabilityManifestTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "must be a frozenset"):
             CapabilityManifest({"read"}, frozenset({"read"}), frozenset())
 
+    def test_rejects_empty_base_and_non_intervenable_manifest(self):
+        with self.assertRaisesRegex(ValueError, "base_capabilities must not be empty"):
+            CapabilityManifest(frozenset(), frozenset(), frozenset({"export"}))
+        with self.assertRaisesRegex(ValueError, "intervention-eligible"):
+            CapabilityManifest(frozenset({"read"}), frozenset({"read"}), frozenset())
+
 
 class CapabilityOverlayTests(unittest.TestCase):
     def test_overlay_applies_to_exactly_two_decision_opportunities(self):
