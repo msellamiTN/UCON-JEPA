@@ -87,7 +87,12 @@ def _fit_support_calibrators(
             "calibration_windows": int(len(raw)),
             "calibration_episodes": int(len(set(episode_ids.tolist()))),
         },
-        "CP": {"scope": "separate_per_position", "params_by_position": {}},
+        "CP": {
+            "scope": "separate_per_position",
+            "calibration_windows": int(len(raw)),
+            "calibration_episodes": int(len(set(episode_ids.tolist()))),
+            "params_by_position": {},
+        },
     }
     for position in valid_positions:
         mask = positions == position
