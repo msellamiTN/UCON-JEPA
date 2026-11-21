@@ -54,6 +54,7 @@ The predictor is advisory. It cannot grant an operation rejected by the formal p
 | G8.4.8.7.5 | docs/research/G8.4.8.7.5_MATCHED_RECURSIVE_CONTROL_RESULTS.md | Five-seed matched JEPA/supervised recursive benchmark and CI passed; no consistent JEPA advantage; original headline metrics pooled sliding windows despite start-step-0 calibration, so decision-time primary estimand is re-evaluated in G8.4.8.7.7 |
 | G8.4.8.7.6 | docs/research/G8.4.8.7.6_CALIBRATION_DIRECTION_DIAGNOSTICS.md | Five-seed diagnostics and full G8.4 CI passed; identified substantial start-step-0 vs all-sliding-window population mismatch and seed-20261122 H1 calibration inversion; no test-driven calibration tuning |
 | G8.4.8.7.7 | [Protocol](docs/research/G8.4.8.7.7_DECISION_TIME_EVALUATION_PROTOCOL.md) / [Results](docs/research/G8.4.8.7.7_DECISION_TIME_EVALUATION_RESULTS.md) | Latest-head five-seed benchmark and full G8.4 CI passed; one start-step-0 forecast per episode; pooled primary plus post-hoc fixed-allocation stratified bootstrap sensitivity validated; mixed seed/subgroup results, no consistent JEPA advantage |
+| G8.4.8.8 | [Causal intervention utility protocol](docs/research/G8.4.8.8_CAUSAL_INTERVENTION_UTILITY_PROTOCOL.md) | Randomized four-arm ITT design specified: JEPA, supervised, reactive UCON, and UCON-only; non-authoritative least-privilege intervention; execution blocked pending six protocol-freeze inputs; no experiment/results claimed |
 
 ## Critical statistical boundary
 
