@@ -30,7 +30,7 @@ class TemporalSupportAlignmentTests(unittest.TestCase):
 
     def test_C0_CP_CA_use_the_prespecified_supports(self):
         fitted = _fit_support_calibrators(
-            self.raw, self.truth, self.positions
+            self.raw, self.truth, self.positions, self.episodes
         )
         self.assertEqual(fitted["C0"]["scope"], "position_0")
         self.assertEqual(fitted["C0"]["calibration_windows"], 20)
