@@ -115,12 +115,33 @@ def _fit_models_and_thresholds(
                     "support": "calibration partition only",
                     "score_source": "recursive E2 Monte Carlo risk mean",
                 }
-    # Test partition arrays are deliberately not passed to model, threshold,
-    # pilot-power or confirmatory routines.
+    # Test partition arrays and their outcome-derived manifest summaries are
+    # deliberately excluded from all model/threshold/pilot objects.
+    manifest = dict(dataset["manifest"])
+    manifest["partition_counts"] = {
+        key: value for key, value in manifest["partition_counts"].items()
+        if key in ("train", "validation", "calibration")
+    }
+    manifest["denial_rates_by_partition_archetype_family_rho"] = {
+        key: value for key, value in manifest[
+            "denial_rates_by_partition_archetype_family_rho"
+        ].items() if key in ("train", "validation", "calibration")
+    }
+    partition_ids = {
+        key: set(dataset[key]["episode_id"].astype(str).tolist())
+        for key in ("train", "validation", "calibration")
+    }
+    if any(
+        partition_ids[a] & partition_ids[b]
+        for a, b in (("train", "validation"), ("train", "calibration"),
+                     ("validation", "calibration"))
+    ):
+        raise AssertionError("train/validation/calibration episode leakage")
     del dataset["test_shifted"]
     del dataset["test_reverse"]
     return models, score_functions, {
-        "dataset_manifest": dataset["manifest"],
+        "dataset_manifest": manifest,
+        "_partition_ids": partition_ids,
         "thresholds": calibration_manifest,
         "_threshold_objects": thresholds,
         "train_episodes": int(len(set(dataset["train"]["episode_id"].tolist()))),
@@ -422,7 +443,9 @@ def main() -> None:
         )
         # Retain unrounded threshold structures for scoring.
         thresholds_by_seed[seed] = calibration.pop("_threshold_objects")
+        partition_ids = calibration.pop("_partition_ids")
         per_seed[seed] = {
+            "partition_ids": partition_ids,
             "models": {
                 name: {
                     "parameter_count": int(model.parameter_count()),
@@ -466,6 +489,19 @@ def main() -> None:
                 assignment_seed=seed + 884_802 + len(assignments),
             ))
 
+    # Assignment IDs must be unique and disjoint from all model-development
+    # partitions before any confirmatory episode is simulated.
+    assigned_ids = [str(spec["episode_id"]) for spec in assignments]
+    if len(assigned_ids) != len(set(assigned_ids)):
+        raise AssertionError("an episode was assigned more than once")
+    for seed in seeds:
+        development_ids = set().union(*per_seed[seed]["partition_ids"].values())
+        test_ids = {
+            str(spec["episode_id"]) for spec in assignments
+            if int(spec["seed"]) == seed
+        }
+        if development_ids & test_ids:
+            raise AssertionError(f"development/test episode overlap for seed {seed}")
     all_results = []
     q0_checks = 0
     for spec in assignments:
