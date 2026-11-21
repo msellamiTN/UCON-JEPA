@@ -94,7 +94,8 @@ def threshold_fires(
         return True
     if score < cutoff:
         return False
-    tie = _tie_uniform(seed, episode_id, step, "threshold-tie")
+    # Calibration and deployment use the same seed-independent tie key.
+    tie = _tie_uniform(0, episode_id, step, "threshold-tie")
     return tie <= float(threshold["tie_cutoff"])
 
 
