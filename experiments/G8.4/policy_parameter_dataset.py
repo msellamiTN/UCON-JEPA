@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 
+from intervention_task_manifests import sample_task_context, task_manifest_records, validate_task_manifests
 from stateful_trajectory_dataset import (
     ACTION_VOCAB, FAMILIES, _context, _initial_state, _online_gate_step,
     _policy_oracle, _state_features,
@@ -117,9 +118,13 @@ def _episode(
     rho: float,
     length: int,
     episode_id: str,
+    task_aware: bool = False,
 ) -> list[dict[str, Any]]:
     rng = random.Random(episode_seed)
-    ctx = _context(rng, family)
+    ctx = (
+        sample_task_context(rng, family, _context)
+        if task_aware else _context(rng, family)
+    )
     state = _initial_state(ctx)
     last_denied_action: str | None = None
     rows = []
@@ -206,6 +211,7 @@ def build_dataset(
     episodes_per_cell: int = 300,
     episode_length: int = 8,
     include_reverse: bool = True,
+    task_aware: bool = False,
 ) -> dict[str, Any]:
     if episodes_per_cell < 50:
         raise ValueError("episodes_per_cell must be >= 50")
@@ -227,7 +233,8 @@ def build_dataset(
                         f"{rho:.2f}-{episode_index:05d}"
                     )
                     rows.extend(_episode(
-                        episode_seed, family, archetype, rho, episode_length, episode_id
+                        episode_seed, family, archetype, rho, episode_length, episode_id,
+                        task_aware=task_aware,
                     ))
 
     partition_rows: dict[str, list[dict[str, Any]]] = {p: [] for p in PARTITIONS}
@@ -286,6 +293,9 @@ def build_dataset(
     manifest = {
         "benchmark": "G8.4.8.7 controlled policy-parameter shift",
         "seed": seed,
+        "task_aware_contexts": bool(task_aware),
+        "task_manifests": task_manifest_records() if task_aware else None,
+        "task_manifest_sha256": validate_task_manifests() if task_aware else None,
         "policy_version": POLICY_VERSION,
         "episodes_per_cell": episodes_per_cell,
         "episode_length": episode_length,
@@ -333,10 +343,11 @@ def main() -> None:
     parser.add_argument("--episodes-per-cell", type=int, default=300)
     parser.add_argument("--out", type=Path, default=Path("policy-parameter-dataset-output"))
     parser.add_argument("--no-reverse", action="store_true")
+    parser.add_argument("--task-aware", action="store_true")
     args = parser.parse_args()
     dataset = build_dataset(
         seed=args.seed, episodes_per_cell=args.episodes_per_cell,
-        include_reverse=not args.no_reverse,
+        include_reverse=not args.no_reverse, task_aware=args.task_aware,
     )
     write_dataset(dataset, args.out)
     print(json.dumps({
