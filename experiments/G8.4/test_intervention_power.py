@@ -84,7 +84,7 @@ class InterventionPowerGateTests(unittest.TestCase):
             self.assertGreaterEqual(report["selected_joint_power"], 0.0)
             self.assertLessEqual(report["selected_joint_power"], 1.0)
             self.assertEqual(report["confirmatory_strata_count"], 150)
-            self.assertFalse(report["confirmatory_generation_authorized"] is False and report["status"] == "POWERED")
+            self.assertEqual(report["confirmatory_generation_authorized"], report["status"] == "POWERED")
 
     def test_power_gate_rejects_target_effect_on_or_inside_null_boundary(self):
         with tempfile.TemporaryDirectory() as temporary:
