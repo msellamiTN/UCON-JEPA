@@ -354,6 +354,11 @@ def _native(value: Any) -> Any:
     return value
 
 
+def _mean_defined(values: list[Any]) -> float | None:
+    finite = [float(value) for value in values if value is not None and math.isfinite(float(value))]
+    return float(np.mean(finite)) if finite else None
+
+
 def _cohort_descriptives(rows: list[dict[str, Any]]) -> dict[str, Any]:
     groups: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
     for row in rows:
@@ -370,12 +375,8 @@ def _cohort_descriptives(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "any_deny_rate": float(np.mean([x["any_deny"] for x in values])),
             "task_completion_rate": float(np.mean([x["task_complete"] for x in values])),
             "mean_warning_rate": float(np.mean([x["warning_rate"] for x in values])),
-            "mean_warning_precision": float(np.nanmean([
-                np.nan if x["warning_precision"] is None else x["warning_precision"] for x in values
-            ])),
-            "mean_warning_recall": float(np.nanmean([
-                np.nan if x["warning_recall"] is None else x["warning_recall"] for x in values
-            ])),
+            "mean_warning_precision": _mean_defined([x["warning_precision"] for x in values]),
+            "mean_warning_recall": _mean_defined([x["warning_recall"] for x in values]),
             "mean_revision_count": float(np.mean([x["revision_count"] for x in values])),
             "mean_distinct_action_count": float(np.mean([x["distinct_action_count"] for x in values])),
             "mean_repeat_after_deny_count": float(np.mean([x["repeat_after_deny_count"] for x in values])),
