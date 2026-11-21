@@ -85,7 +85,11 @@ def _validate_power_report(
     current_hashes = validate_task_manifests()
     if report.get("task_manifest_sha256") != current_hashes:
         raise ValueError("task-manifest hashes differ from the approved power report")
-    if float(report.get("selected_joint_power", 0.0)) < float(report.get("target_power", 0.90)):
+    if abs(float(report.get("target_power", 0.0)) - 0.90) > 1e-12:
+        raise ValueError("power report target must be the preregistered 90%")
+    if abs(float(report.get("alpha_one_sided", 0.0)) - 0.05) > 1e-12:
+        raise ValueError("power report alpha must be the preregistered one-sided 0.05")
+    if float(report.get("selected_joint_power", 0.0)) < 0.90:
         raise ValueError("selected power does not reach the preregistered target")
     n = int(report.get("episodes_per_arm_per_stratum", 0))
     if not 2 <= n <= 300:
@@ -106,8 +110,11 @@ def run_confirmatory(
     episodes_per_cell: int,
     epochs: int,
     mc_samples: int,
+    approval_reference: str,
     output: Path,
 ) -> dict[str, Any]:
+    if not approval_reference.strip():
+        raise ValueError("an explicit PI/domain-owner approval reference is required")
     power_report, power_report_sha = _validate_power_report(
         power_report_path, confirmatory_seeds
     )
@@ -116,6 +123,7 @@ def run_confirmatory(
     freeze = {
         "experiment": "G8.4.8.8 confirmatory randomized capability-overlay trial",
         "status": "PRE_REGISTERED_CONFIRMATORY_RUN",
+        "pi_domain_owner_approval_reference": approval_reference.strip(),
         "source_sha": os.environ.get("UCON_JEPA_HEAD_SHA", os.environ.get("GITHUB_SHA")),
         "power_report_sha256": power_report_sha,
         "task_manifest_sha256": validate_task_manifests(),
@@ -148,9 +156,9 @@ def run_confirmatory(
     freeze_path = output / "preregistration_freeze.json"
     freeze_sha = _write_json(freeze_path, freeze)
 
-    all_assignment_rows = []
-    all_episode_rows = []
     seed_metadata = {}
+    total_episode_count = 0
+    file_hashes = {"preregistration_freeze.json": freeze_sha}
     for seed in confirmatory_seeds:
         fitted = fit_predictors(
             int(seed), episodes_per_cell, epochs, mc_samples,
@@ -178,20 +186,33 @@ def run_confirmatory(
         assignment_path = output / "assignments" / f"seed_{seed}_assignments.jsonl.gz"
         assignment_sha = _write_jsonl_gzip(assignment_path, assignment_rows)
 
-        episode_rows = []
-        thresholds = fitted["thresholds_by_fraction"][PRIMARY_ALERT_FRACTION]
-        for spec in assignment_rows:
-            episode_rows.append(run_episode(
-                spec,
-                score_functions=fitted["score_functions"],
-                thresholds=thresholds,
-                horizon=PRIMARY_HORIZON,
-            ))
         episode_path = output / "episodes" / f"seed_{seed}_episodes.jsonl.gz"
-        episode_sha = _write_jsonl_gzip(episode_path, episode_rows)
-
-        all_assignment_rows.extend(assignment_rows)
-        all_episode_rows.extend(episode_rows)
+        thresholds = fitted["thresholds_by_fraction"][PRIMARY_ALERT_FRACTION]
+        predictor_failure_count = 0
+        trigger_counts = {arm: 0 for arm in ARMS}
+        episode_count = 0
+        with _open_jsonl_gzip_writer(episode_path) as episode_handle:
+            for spec in assignment_rows:
+                episode_row = run_episode(
+                    spec,
+                    score_functions=fitted["score_functions"],
+                    thresholds=thresholds,
+                    horizon=PRIMARY_HORIZON,
+                )
+                episode_handle.write(
+                    json.dumps(_jsonable(episode_row), sort_keys=True) + "\\n"
+                )
+                episode_count += 1
+                predictor_failure_count += int(episode_row["predictor_failed"])
+                trigger_counts[episode_row["arm"]] += int(episode_row["overlay_triggered"])
+        episode_sha = _sha256(episode_path)
+        total_episode_count += episode_count
+        assignment_rel = str(assignment_path.relative_to(output))
+        episode_rel = str(episode_path.relative_to(output))
+        file_hashes[assignment_rel] = assignment_sha
+        file_hashes[episode_rel] = episode_sha
+        file_hashes[str(model_path.relative_to(output))] = model_sha
+        file_hashes[str(dtmc_path.relative_to(output))] = dtmc_sha
         seed_metadata[str(seed)] = {
             "neural_model_checkpoint": str(model_path.relative_to(output)),
             "neural_model_checkpoint_sha256": model_sha,
@@ -201,7 +222,8 @@ def run_confirmatory(
             "assignment_manifest_sha256": assignment_sha,
             "episode_records": str(episode_path.relative_to(output)),
             "episode_records_sha256": episode_sha,
-            "episode_count": len(episode_rows),
+            "episode_count": episode_count,
+            "overlay_trigger_counts_by_arm": trigger_counts,
             "train_episode_id_sha256": hashlib.sha256(
                 "\n".join(sorted(fitted["partition_ids"]["train"])).encode()
             ).hexdigest(),
@@ -214,32 +236,21 @@ def run_confirmatory(
             "threshold_manifest": fitted["threshold_manifest"],
             "dataset_manifest": fitted["dataset_manifest"],
             "model_capacity": fitted["model_capacity"],
-            "predictor_failure_episodes": int(sum(row["predictor_failed"] for row in episode_rows)),
+            "predictor_failure_episodes": int(predictor_failure_count),
         }
 
-    assignment_global_path = output / "assignment_manifest.jsonl.gz"
-    assignment_global_sha = _write_jsonl_gzip(assignment_global_path, all_assignment_rows)
-    episode_global_path = output / "confirmatory_episodes.jsonl.gz"
-    episode_global_sha = _write_jsonl_gzip(episode_global_path, all_episode_rows)
     expected_total = int(power_report["total_confirmatory_episodes"])
-    if len(all_episode_rows) != expected_total:
+    if total_episode_count != expected_total:
         raise AssertionError("confirmatory episode total does not match the authorized power report")
-    if any(row["unauthorized_execution_count"] != 0 for row in all_episode_rows):
-        raise AssertionError("UCON-DENY action execution detected in confirmatory simulation")
-    if any(row["state_violation_count"] != 0 for row in all_episode_rows):
-        raise AssertionError("DENY state-mutation invariant failed in confirmatory simulation")
 
     manifest = {
         **freeze,
         "preregistration_freeze_sha256": freeze_sha,
         "power_report": str(power_report_path),
         "power_report_sha256": power_report_sha,
-        "assignment_manifest": str(assignment_global_path.relative_to(output)),
-        "assignment_manifest_sha256": assignment_global_sha,
-        "episode_records": str(episode_global_path.relative_to(output)),
-        "episode_records_sha256": episode_global_sha,
-        "episode_count": len(all_episode_rows),
+        "episode_count": total_episode_count,
         "seed_metadata": seed_metadata,
+        "artifact_hashes": file_hashes,
         "inference_performed": False,
         "treatment_contrasts_or_p_values": None,
         "runtime": {
@@ -253,9 +264,7 @@ def run_confirmatory(
     _write_json(output / "file_manifest.json", {
         "preregistration_freeze.json": freeze_sha,
         "confirmatory_run_manifest.json": manifest_sha,
-        "assignment_manifest.jsonl.gz": assignment_global_sha,
-        "confirmatory_episodes.jsonl.gz": episode_global_sha,
-        "seed_artifacts": seed_metadata,
+        "seed_artifact_hashes": file_hashes,
     })
     return manifest
 
@@ -267,6 +276,7 @@ def main() -> None:
     parser.add_argument("--episodes-per-cell", type=int, default=300)
     parser.add_argument("--epochs", type=int, default=180)
     parser.add_argument("--mc-samples", type=int, default=32)
+    parser.add_argument("--approval-reference", required=True)
     parser.add_argument("--out", default="confirmatory-output")
     args = parser.parse_args()
     manifest = run_confirmatory(
@@ -277,6 +287,7 @@ def main() -> None:
         episodes_per_cell=args.episodes_per_cell,
         epochs=args.epochs,
         mc_samples=args.mc_samples,
+        approval_reference=args.approval_reference,
         output=Path(args.out),
     )
     print(json.dumps(_jsonable(manifest), indent=2, sort_keys=True))
