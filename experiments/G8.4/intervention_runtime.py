@@ -30,8 +30,21 @@ class CapabilityManifest:
     base_capabilities: FrozenSet[str]
     essential_capabilities: FrozenSet[str]
     restricted_capabilities: FrozenSet[str]
+    task_id: str
+    family: str
+    task_intent: str
+    completion_condition: str
+    restriction_rationale: str
+    manifest_version: str = "g8.4.8.8-task-v1"
 
     def __post_init__(self) -> None:
+        for field_name in (
+            "task_id", "family", "task_intent", "completion_condition",
+            "restriction_rationale", "manifest_version",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must be a non-empty string")
         for field_name, values in (
             ("base_capabilities", self.base_capabilities),
             ("essential_capabilities", self.essential_capabilities),
@@ -45,12 +58,18 @@ class CapabilityManifest:
             raise ValueError("base_capabilities must not be empty")
         if not self.restricted_capabilities:
             raise ValueError("restricted_capabilities must not be empty for an intervention-eligible task")
+        if not self.essential_capabilities:
+            raise ValueError("essential_capabilities must not be empty")
         if not self.essential_capabilities <= self.base_capabilities:
             raise ValueError("essential capabilities must be a subset of base capabilities")
         if not self.restricted_capabilities <= self.base_capabilities:
             raise ValueError("restricted capabilities must be a subset of base capabilities")
         if self.essential_capabilities & self.restricted_capabilities:
             raise ValueError("essential capabilities cannot be restricted")
+        if not self.restricted_capabilities <= (
+            self.base_capabilities - self.essential_capabilities
+        ):
+            raise ValueError("restricted capabilities must be nonessential")
 
 
 @dataclass(frozen=True)
