@@ -26,7 +26,6 @@ from intervention_task_manifests import (
     validate_task_manifests,
 )
 from policy_parameter_dataset import (
-    FAMILY_ACTIONS,
     POLICY_ARCHETYPES,
     _parameterized_action,
     _policy_context,
@@ -123,8 +122,10 @@ def make_blocked_episode_specs(
     """Create feasible task episodes and balanced four-arm blocked assignments."""
     if episodes_per_arm_per_stratum < 1:
         raise ValueError("episodes_per_arm_per_stratum must be positive")
-    if not math.isfinite(float(rho)):
-        raise ValueError("rho must be finite")
+    if not seeds:
+        raise ValueError("at least one seed is required")
+    if not math.isfinite(float(rho)) or not 0.0 <= float(rho) <= 1.0:
+        raise ValueError("rho must be finite and in [0, 1]")
     validate_task_manifests()
     specs: list[dict[str, Any]] = []
     for seed in sorted(set(int(value) for value in seeds)):
@@ -209,6 +210,12 @@ def run_episode(
     difficulty = str(spec["task_difficulty"])
     if arm not in ARMS:
         raise ValueError(f"unknown intervention arm: {arm}")
+    for model_name, threshold in thresholds.items():
+        if not math.isfinite(float(threshold["threshold"])):
+            raise ValueError(f"non-finite threshold for {model_name}")
+        tie_fraction = float(threshold.get("tie_fraction", 1.0))
+        if not 0.0 <= tie_fraction <= 1.0:
+            raise ValueError(f"invalid tie fraction for {model_name}")
     if archetype not in POLICY_ARCHETYPES or family not in FAMILIES:
         raise ValueError("unknown policy archetype or task family")
     if difficulty not in TASK_DIFFICULTY_LEVELS[family]:
@@ -332,11 +339,6 @@ def run_episode(
         else:
             raise AssertionError(f"unexpected fail-closed outcome: {decision.outcome}")
 
-        if decision.outcome is not ProposalOutcome.DENIED_BY_UCON:
-            if any(state[key] != before[key] for key in PROTECTED_STATE_FIELDS):
-                # Allowed state transitions are validated below by the gate; the
-                # comparison is intentionally not applied to successful PERMITs.
-                pass
         overlay.end_decision()
         records.append({
             "step": step,
