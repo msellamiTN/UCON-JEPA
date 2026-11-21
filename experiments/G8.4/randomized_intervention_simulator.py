@@ -265,12 +265,15 @@ def run_episode(
         and not records[i - 1]["ucon_allowed"]
         for i in range(1, len(records))
     )
+    task_complete = bool(_task_complete(family, state))
     return {
         "episode_id": episode_id, "seed": seed, "archetype": archetype,
         "family": family, "rho": rho, "q": q, "horizon": horizon, "arm": arm,
         "denied_count": int(denied), "denied_rate": denied / EPISODE_LENGTH,
         "any_deny": bool(denied > 0),
-        "task_complete": bool(_task_complete(family, state)),
+        "task_complete": task_complete,
+        "safe_task_complete": bool(task_complete and denied == 0),
+        "recovered_task_complete": bool(task_complete and denied > 0),
         "warning_count": int(warnings), "eligible_decisions": int(eligible_count),
         "warning_rate": warnings / eligible_count,
         "revision_count": int(revisions),
