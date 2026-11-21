@@ -15,12 +15,13 @@ class TemporalSupportAlignmentTests(unittest.TestCase):
         self.positions = np.repeat(np.arange(4), 20)
         self.truth = np.tile(np.asarray([0, 1] * 10), 4)
         self.raw = np.where(self.truth == 1, 0.75, 0.25)
-        self.episodes = np.asarray([f"ep-{i:02d}" for i in range(80)])
-        self.policies = np.asarray(
-            ["goal_directed"] * 40 + ["uniform"] * 40
+        episode_ids = np.asarray([f"ep-{i:02d}" for i in range(20)])
+        self.episodes = np.tile(episode_ids, 4)
+        self.policies = np.tile(
+            np.asarray(["goal_directed"] * 10 + ["uniform"] * 10), 4
         )
-        self.families = np.asarray(
-            ["iam"] * 20 + ["data"] * 20 + ["iam"] * 20 + ["data"] * 20
+        self.families = np.tile(
+            np.asarray(["iam"] * 5 + ["data"] * 5 + ["iam"] * 5 + ["data"] * 5), 4
         )
         self.windows = {
             "episode_id": self.episodes,
@@ -45,7 +46,7 @@ class TemporalSupportAlignmentTests(unittest.TestCase):
 
     def test_CP_applies_only_to_matching_positions(self):
         fitted = _fit_support_calibrators(
-            self.raw, self.truth, self.positions
+            self.raw, self.truth, self.positions, self.episodes
         )
         predictions = _apply_support_calibrators(
             self.raw, self.positions, fitted
@@ -79,12 +80,12 @@ class TemporalSupportAlignmentTests(unittest.TestCase):
         )
         self.assertEqual(result["unit"],
             "whole episode, stratified by behavior archetype/resource family")
-        self.assertEqual(result["episodes"], 80)
+        self.assertEqual(result["episodes"], 20)
         self.assertEqual(result["strata"], {
-            "goal_directed/iam": 20,
-            "goal_directed/data": 20,
-            "uniform/iam": 20,
-            "uniform/data": 20,
+            "goal_directed/iam": 5,
+            "goal_directed/data": 5,
+            "uniform/iam": 5,
+            "uniform/data": 5,
         })
         self.assertEqual(result["replicates"], 200)
 
