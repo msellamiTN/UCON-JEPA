@@ -39,11 +39,12 @@ from stateful_trajectory_dataset import (
 )
 
 ARMS = ("ucon_only", "reactive_overlay", "jepa_overlay", "supervised_overlay")
-PILOT_ONLY_ARMS = ("random_overlay_pilot",)
+PILOT_ONLY_ARMS = ("random_overlay_pilot", "dtmc_overlay_pilot")
 ALLOWED_ARMS = ARMS + PILOT_ONLY_ARMS
 PREDICTIVE_ARM_MODEL = {
     "jepa_overlay": "jepa",
     "supervised_overlay": "supervised",
+    "dtmc_overlay_pilot": "dtmc",
 }
 TASK_MANIFEST_HASHES = validate_task_manifests()
 EPISODE_LENGTH = 8
