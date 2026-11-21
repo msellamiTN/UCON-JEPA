@@ -213,8 +213,11 @@ def run_pilot(
     }
     summary_path = output / "pilot_summary.json"
     summary_sha = _write_json(summary_path, summary)
-    summary["pilot_summary_sha256"] = summary_sha
-    _write_json(summary_path, summary)
+    _write_json(output / "pilot_file_manifest.json", {
+        "pilot_summary.json": summary_sha,
+        "episode_records": episode_sha,
+        "seed_artifacts": seed_metadata,
+    })
     return summary
 
 
