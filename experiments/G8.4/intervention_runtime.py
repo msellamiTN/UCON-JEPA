@@ -74,6 +74,8 @@ class CapabilityOverlay:
     """
 
     def __init__(self, manifest: CapabilityManifest, duration_decisions: int = 2):
+        if not isinstance(manifest, CapabilityManifest):
+            raise TypeError("manifest must be a CapabilityManifest")
         if not isinstance(duration_decisions, int) or isinstance(duration_decisions, bool):
             raise TypeError("duration_decisions must be an integer")
         if duration_decisions <= 0:
@@ -144,6 +146,10 @@ class CapabilityOverlay:
         if not self._decision_open:
             raise RuntimeError("begin_decision() must precede proposal evaluation")
         overlay_active = self.active
+        if not isinstance(proposal, str) or not proposal.strip():
+            return ProposalDecision(
+                ProposalOutcome.UCON_FAILURE_DENY, None, overlay_active, self._remaining
+            )
         try:
             verdict = ucon_decider(proposal)
         except Exception:
