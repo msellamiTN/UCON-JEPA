@@ -61,6 +61,8 @@ def _pooled_blinded_covariance(rows: list[dict[str, Any]]) -> tuple[np.ndarray, 
     covariance = scatter / degrees
     if not np.all(np.isfinite(covariance)):
         raise ValueError("non-finite blinded pilot covariance")
+    if covariance[0, 0] <= 1e-10 or covariance[1, 1] <= 1e-10:
+        raise ValueError("pilot outcome variance is degenerate; sample-size planning is not identifiable")
     # Numerical PSD repair only; the magnitude is reported.
     eigenvalues, eigenvectors = np.linalg.eigh(covariance)
     minimum_eigenvalue = float(np.min(eigenvalues))
@@ -118,7 +120,7 @@ def _max_t_critical(
     replicates: int,
     rng: np.random.Generator,
 ) -> float:
-    values, vectors = np.linalg.eigh(correlation)
+    values, vectors = np.linalg.eigh(oriented_correlation)
     root = vectors @ np.diag(np.sqrt(np.maximum(values, 0.0)))
     z = rng.standard_normal((replicates, 6)) @ root.T
     chi = rng.chisquare(max(1, degrees_of_freedom), size=replicates)
@@ -141,6 +143,8 @@ def _joint_power(
 ) -> dict[str, float]:
     covariance = covariance_per_episode / float(n_per_arm_per_stratum)
     standard_errors = np.sqrt(np.maximum(np.diag(covariance), 1e-12))
+    orientation = np.asarray([-1.0, -1.0, -1.0, 1.0, 1.0, 1.0])
+    oriented_correlation = correlation * np.outer(orientation, orientation)
     # Oriented one-sided test-statistic means under the PI-declared target scenario.
     distances = np.asarray([
         target_effects["target_u_effect"] - margins["delta_U"],
@@ -154,7 +158,7 @@ def _joint_power(
 
     critical_rng = np.random.default_rng(seed + 101)
     critical = _max_t_critical(
-        correlation, alpha=alpha,
+        oriented_correlation, alpha=alpha,
         degrees_of_freedom=max(2, block_count * 4 * (n_per_arm_per_stratum - 1)),
         replicates=critical_replicates, rng=critical_rng,
     )
@@ -233,6 +237,14 @@ def plan_sample_size(
             raise ValueError("pilot task-manifest hashes do not match current frozen manifests")
 
     covariance_outcomes, residual_df, cell_count = _pooled_blinded_covariance(rows)
+    expected_pilot_blocks = (
+        len(pilot_seeds) * len(pilot_rhos) * ARCHETYPE_COUNT * FAMILY_COUNT * DIFFICULTY_COUNT
+    )
+    expected_cells = expected_pilot_blocks * len(ARMS)
+    if cell_count != expected_cells:
+        raise ValueError(
+            f"pilot is missing confirmatory arm/block cells: {cell_count} != {expected_cells}"
+        )
     block_count = (
         len(confirmatory_seeds) * ARCHETYPE_COUNT * FAMILY_COUNT * DIFFICULTY_COUNT
     )
