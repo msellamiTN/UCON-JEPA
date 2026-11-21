@@ -281,6 +281,7 @@ def _power_gate(
         "alpha_two_sided": POWER_ALPHA,
         "power_simulation_replicates": replicates,
         "power_simulation_seed": seed,
+        "power_test": "blocked two-sided Wald z test at fixed MDE using empirical-residual Monte Carlo sampling distribution",
         "analytic_candidate_used_only_for_search_initialization": analytic_candidate,
         "simulated_power_at_selected_n": float(candidate_power),
         "simulated_power_at_maximum": float(power_at_maximum),
@@ -673,6 +674,11 @@ def main() -> None:
         "seeds": seeds,
         "power_gate": power,
         "primary_analysis": primary_analysis,
+        "inferential_status": (
+            "confirmatory_power_gate_passed"
+            if power["confirmatory_power_gate_passed"]
+            else "underpowered_exploratory_only"
+        ),
         "all_arm_descriptives": arm_summaries,
         "stratified_cohort_descriptives": _cohort_descriptives(all_results),
         "q0_exact_negative_control_replays": q0_checks,
