@@ -293,9 +293,6 @@ def build_dataset(
     manifest = {
         "benchmark": "G8.4.8.7 controlled policy-parameter shift",
         "seed": seed,
-        "task_aware_contexts": bool(task_aware),
-        "task_manifests": task_manifest_records() if task_aware else None,
-        "task_manifest_sha256": validate_task_manifests() if task_aware else None,
         "policy_version": POLICY_VERSION,
         "episodes_per_cell": episodes_per_cell,
         "episode_length": episode_length,
@@ -313,6 +310,10 @@ def build_dataset(
         "partition_counts": counts,
         "denial_rates_by_partition_archetype_family_rho": denial_rates,
     }
+    if task_aware:
+        manifest["task_aware_contexts"] = True
+        manifest["task_manifests"] = task_manifest_records()
+        manifest["task_manifest_sha256"] = validate_task_manifests()
     return {"manifest": manifest, **output}
 
 
