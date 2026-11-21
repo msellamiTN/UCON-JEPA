@@ -1,7 +1,7 @@
 name: G8.4.8.8 Randomized Intervention Simulator
 
 concurrency:
-  group: g8-4-8-8-${{ github.event.pull_request.number || github.ref }}
+  group: g8-4-8-8-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 on:
