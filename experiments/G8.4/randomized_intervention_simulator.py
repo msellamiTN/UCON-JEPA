@@ -193,7 +193,8 @@ def run_episode(
 
         warning = False
         risk_score: float | None = None
-        if arm in ("jepa_advisory", "supervised_advisory"):
+        eligible = step <= EPISODE_LENGTH - horizon
+        if eligible and arm in ("jepa_advisory", "supervised_advisory"):
             risk_score = float(score_functions[model_name](
                 context.copy(), horizon,
                 _keyed_seed(seed, episode_id, step, f"{model_name}-rollout"),
@@ -202,7 +203,7 @@ def run_episode(
             if step not in by_horizon:
                 raise ValueError(f"missing frozen threshold: {model_name}/H={horizon}/step={step}")
             warning = threshold_fires(risk_score, by_horizon[step], seed, episode_id, step)
-        elif arm == "random_advisory":
+        elif eligible and arm == "random_advisory":
             warning = _keyed_rng(seed, episode_id, step, "random-warning").random() < random_warning_rate
 
         proposed = original
@@ -236,7 +237,7 @@ def run_episode(
             "risk_score": risk_score, "ucon_allowed": bool(gate_allowed),
             "denial_reason": gate_reason or "",
             "task_complete": _task_complete(family, after),
-            "state_violation": bool(after["violation"]),
+            "state_violation": False,  # DENY is not a state violation; gate/oracle disagreement raises above.
         })
         state = after
         last_denied_action = None if gate_allowed else proposed
