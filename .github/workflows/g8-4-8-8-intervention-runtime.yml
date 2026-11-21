@@ -38,6 +38,6 @@ jobs:
       - name: Run complete G8.4 regression suite
         working-directory: experiments/G8.4
         run: python -m unittest discover -v
-      - name: Run focused intervention runtime and simulator tests
+      - name: Run focused intervention and counterfactual contract tests
         working-directory: experiments/G8.4
-        run: python -m unittest -v test_intervention_runtime test_intervention_task_manifests test_intervention_dtmc test_intervention_simulator test_intervention_power test_intervention_confirmatory test_intervention_analysis
+        run: python -m unittest -v test_intervention_runtime test_intervention_task_manifests test_intervention_dtmc test_intervention_simulator test_intervention_power test_intervention_confirmatory test_intervention_analysis test_counterfactual_policy_world_model
