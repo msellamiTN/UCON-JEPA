@@ -121,6 +121,7 @@ def _fit_models_and_thresholds(
     return models, score_functions, {
         "dataset_manifest": dataset["manifest"],
         "thresholds": calibration_manifest,
+        "_threshold_objects": thresholds,
         "train_episodes": int(len(set(dataset["train"]["episode_id"].tolist()))),
         "validation_episodes": int(len(set(dataset["validation"]["episode_id"].tolist()))),
         "calibration_episodes": int(len(set(dataset["calibration"]["episode_id"].tolist()))),
@@ -159,8 +160,9 @@ def _power_gate(
     sigma2 = float(np.mean(variances))
     required = None
     achieved = None
+    n_strata = 15 * len({int(row["seed"]) for row in pilot})
     for n in range(1, max_per_arm + 1):
-        achieved = _power_for_n(n, sigma2)
+        achieved = _power_for_n(n, sigma2, n_strata=n_strata)
         if achieved >= POWER_TARGET:
             required = n
             break
@@ -173,7 +175,8 @@ def _power_gate(
         "minimum_detectable_effect": PRIMARY_MDE,
         "target_power": POWER_TARGET,
         "alpha_two_sided": POWER_ALPHA,
-        "power_at_maximum": _power_for_n(max_per_arm, sigma2),
+        "power_at_maximum": _power_for_n(max_per_arm, sigma2, n_strata=n_strata),
+        "standardized_strata": n_strata,
         "required_episodes_per_arm_per_archetype_family_stratum": required,
         "selected_episodes_per_arm_per_stratum": selected,
         "maximum_episodes_per_arm_per_stratum": max_per_arm,
@@ -350,36 +353,6 @@ def _native(value: Any) -> Any:
     return value
 
 
-def run_seed(
-    seed: int, args: argparse.Namespace,
-) -> dict[str, Any]:
-    models, score_functions, calibration = _fit_models_and_thresholds(
-        seed, args.episodes_per_cell, args.epochs, args.mc_samples
-    )
-    pilot = _run_pilot(
-        seed, score_functions, {
-            name: _thresholds_from_manifest(calibration, name)
-            for name in ()
-        }, args.pilot_episodes_per_stratum,
-    )
-    # Use the actual frozen in-memory thresholds, not reconstructed report data.
-    # The caller supplies them through the private field set by main.
-    thresholds = args._thresholds_by_seed[seed]
-    pilot = _run_pilot(
-        seed, score_functions, thresholds, args.pilot_episodes_per_stratum
-    )
-    return {
-        "seed": seed, "models": models, "score_functions": score_functions,
-        "calibration": calibration, "pilot": pilot,
-    }
-
-
-def _thresholds_from_manifest(calibration: dict[str, Any], model: str) -> dict[str, Any]:
-    # Kept only as a shape helper; actual threshold objects are returned directly
-    # by the model-fitting path and are never reconstructed from rounded JSON.
-    return {}
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", default=",".join(map(str, SEEDS)))
@@ -418,7 +391,6 @@ def main() -> None:
             "calibration": calibration,
             "score_functions": score_functions,
         }
-    args._thresholds_by_seed = thresholds_by_seed
 
     pilot_rows = []
     for seed in seeds:
