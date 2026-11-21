@@ -61,6 +61,14 @@ def _load_and_validate_trial(
     power_report = json.loads(power_report_path.read_text(encoding="utf-8"))
     if power_report.get("status") != "POWERED" or not power_report.get("confirmatory_generation_authorized"):
         raise ValueError("confirmatory trial references a non-authorizing power report")
+    if abs(float(power_report.get("target_power", 0.0)) - 0.90) > 1e-12:
+        raise ValueError("power report does not meet the preregistered 90% target")
+    if abs(float(power_report.get("alpha_one_sided", 0.0)) - 0.05) > 1e-12:
+        raise ValueError("power report does not use the preregistered one-sided alpha")
+    if set(int(value) for value in power_report.get("pilot_seeds", [])) & set(
+        int(value) for value in power_report.get("confirmatory_seeds", [])
+    ):
+        raise ValueError("pilot and confirmatory seeds overlap")
     if _sha256(freeze_path) != run_manifest.get("preregistration_freeze_sha256"):
         raise ValueError("preregistration freeze checksum mismatch")
     if freeze.get("power_report_sha256") != power_report_sha:
@@ -140,6 +148,10 @@ def _build_outcome_array(
             raise ValueError("non-primary rho found in confirmatory outcomes")
         if row["task_manifest_sha256"] != TASK_MANIFEST_HASHES[str(row["family"])]:
             raise ValueError("episode task-manifest hash mismatch")
+        if not 0 <= int(row["denied_count"]) <= 8:
+            raise ValueError("DENY proposal count is outside the episode bounds")
+        if not isinstance(row["task_complete"], bool):
+            raise ValueError("task completion outcome must be boolean")
         if int(row["unauthorized_execution_count"]) != 0:
             raise ValueError("unauthorized execution detected")
         if int(row["state_violation_count"]) != 0:
@@ -152,6 +164,11 @@ def _build_outcome_array(
     expected_blocks = 150
     if len(blocks) != expected_blocks:
         raise ValueError(f"expected {expected_blocks} confirmatory blocks, observed {len(blocks)}")
+    blocks_by_seed: dict[int, set[str]] = defaultdict(set)
+    for row in rows:
+        blocks_by_seed[int(row["seed"])].add(str(row["stratum"]))
+    if len(blocks_by_seed) != 5 or any(len(seed_blocks) != 30 for seed_blocks in blocks_by_seed.values()):
+        raise ValueError("each of the five confirmatory seeds must contain exactly 30 strata")
     values = np.empty((len(blocks), len(ARMS), n_per_arm_per_block, 2), dtype=np.float64)
     block_summaries = []
     for block_index, block in enumerate(blocks):
@@ -208,6 +225,8 @@ def _bootstrap_max_t(
     seed: int,
     chunk_size: int = 20,
 ) -> tuple[float, np.ndarray]:
+    if replicates < 100:
+        raise ValueError("at least 100 bootstrap replicates are required")
     block_count, arm_count, n, _outcomes = values.shape
     rng = np.random.default_rng(seed)
     maxima = np.empty(replicates, dtype=np.float64)
@@ -246,6 +265,8 @@ def _randomization_max_t(
     seed: int,
     chunk_size: int = 20,
 ) -> tuple[dict[str, float], float]:
+    if replicates < 100:
+        raise ValueError("at least 100 randomization replicates are required")
     block_count, arm_count, n, _outcomes = values.shape
     rng = np.random.default_rng(seed)
     pooled = values.reshape(block_count, arm_count * n, 2)
@@ -302,6 +323,8 @@ def analyze_trial(
     randomization_replicates: int = 100000,
     seed: int = 20261121,
 ) -> dict[str, Any]:
+    if bootstrap_replicates < 100 or randomization_replicates < 100:
+        raise ValueError("bootstrap and randomization analyses require at least 100 replicates")
     run_manifest, freeze, rows, n = _load_and_validate_trial(
         trial_dir, power_report_path
     )
