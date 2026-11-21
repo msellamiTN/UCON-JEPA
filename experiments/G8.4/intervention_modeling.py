@@ -96,6 +96,7 @@ def fit_predictors(
     mc_samples: int,
     *,
     alert_fractions: tuple[float, ...] = (0.05, 0.10, 0.20),
+    evaluate_holdout: bool = False,
 ) -> dict[str, Any]:
     """Fit both predictors and freeze episode-max alert thresholds on validation."""
     if mc_samples < 1:
@@ -204,35 +205,36 @@ def fit_predictors(
             "episode_aggregation": "maximum over eligible decision points",
         }
 
-    predictive_metrics = {}
-    for partition_name in ("test_shifted", "test_reverse"):
-        part = dataset[partition_name]
-        test_windows = _make_windows(part, horizon=1)
-        labels = np.asarray(test_windows["security"][:, 0], dtype=np.int64)
-        metrics_for_partition = {}
-        for name, (model, action_head, temperature) in models.items():
-            prediction = rollout_predicted_actions(
-                model, action_head, test_windows["context"],
-                scalers["context_scaler"], scalers["action_scaler"],
-                temperature, horizon=1, mc_samples=mc_samples,
-                seed=seed + 920_000 + (0 if name == "jepa" else 50_000)
-                + (0 if partition_name == "test_shifted" else 5_000),
-            )
-            metrics_for_partition[name] = binary_risk_metrics(
-                labels, prediction["risk_mean"]
-            )
-        dtmc_scores = np.asarray([
-            dtmc_model.predict_one(context, str(family), horizon=1)
-            for context, family in zip(test_windows["context"], test_windows["family"])
-        ], dtype=np.float64)
-        metrics_for_partition["dtmc"] = binary_risk_metrics(labels, dtmc_scores)
-        metrics_for_partition["support"] = {
-            "rows": int(len(labels)),
-            "episodes": int(len(set(str(x) for x in test_windows["episode_id"].tolist()))),
-            "horizon": 1,
-            "test_labels_used_for_fitting_or_thresholds": False,
-        }
-        predictive_metrics[partition_name] = metrics_for_partition
+    predictive_metrics = None
+    if evaluate_holdout:
+        for partition_name in ("test_shifted", "test_reverse"):
+            part = dataset[partition_name]
+            test_windows = _make_windows(part, horizon=1)
+            labels = np.asarray(test_windows["security"][:, 0], dtype=np.int64)
+            metrics_for_partition = {}
+            for name, (model, action_head, temperature) in models.items():
+                prediction = rollout_predicted_actions(
+                    model, action_head, test_windows["context"],
+                    scalers["context_scaler"], scalers["action_scaler"],
+                    temperature, horizon=1, mc_samples=mc_samples,
+                    seed=seed + 920_000 + (0 if name == "jepa" else 50_000)
+                    + (0 if partition_name == "test_shifted" else 5_000),
+                )
+                metrics_for_partition[name] = binary_risk_metrics(
+                    labels, prediction["risk_mean"]
+                )
+            dtmc_scores = np.asarray([
+                dtmc_model.predict_one(context, str(family), horizon=1)
+                for context, family in zip(test_windows["context"], test_windows["family"])
+            ], dtype=np.float64)
+            metrics_for_partition["dtmc"] = binary_risk_metrics(labels, dtmc_scores)
+            metrics_for_partition["support"] = {
+                "rows": int(len(labels)),
+                "episodes": int(len(set(str(x) for x in test_windows["episode_id"].tolist()))),
+                "horizon": 1,
+                "test_labels_used_for_fitting_or_thresholds": False,
+            }
+            predictive_metrics[partition_name] = metrics_for_partition
 
     partition_ids = {
         key: set(str(value) for value in dataset[key]["episode_id"].tolist())
