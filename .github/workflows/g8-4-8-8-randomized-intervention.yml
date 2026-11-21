@@ -1,5 +1,9 @@
 name: G8.4.8.8 Randomized Intervention Simulator
 
+concurrency:
+  group: g8-4-8-8-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -16,6 +20,7 @@ on:
 jobs:
   randomized-intervention:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
