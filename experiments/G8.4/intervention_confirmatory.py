@@ -78,6 +78,11 @@ def _validate_power_report(
     report_sha = _sha256(report_path)
     if report.get("status") != "POWERED" or not report.get("confirmatory_generation_authorized"):
         raise RuntimeError("confirmatory generation blocked: max-t power gate did not authorize it")
+    current_source_sha = os.environ.get("UCON_JEPA_HEAD_SHA", os.environ.get("GITHUB_SHA"))
+    if current_source_sha and report.get("source_sha") != current_source_sha:
+        raise ValueError("power report source SHA differs from current confirmatory source SHA")
+    if report.get("pilot_source_sha") != report.get("source_sha"):
+        raise ValueError("pilot and power-gate source SHAs differ")
     if sorted(int(value) for value in report.get("confirmatory_seeds", [])) != sorted(confirmatory_seeds):
         raise ValueError("confirmatory seed list differs from the approved power report")
     if len(confirmatory_seeds) != 5 or len(set(confirmatory_seeds)) != 5:
