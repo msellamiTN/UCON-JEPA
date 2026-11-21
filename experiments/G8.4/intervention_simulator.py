@@ -39,6 +39,8 @@ from stateful_trajectory_dataset import (
 )
 
 ARMS = ("ucon_only", "reactive_overlay", "jepa_overlay", "supervised_overlay")
+PILOT_ONLY_ARMS = ("random_overlay_pilot",)
+ALLOWED_ARMS = ARMS + PILOT_ONLY_ARMS
 PREDICTIVE_ARM_MODEL = {
     "jepa_overlay": "jepa",
     "supervised_overlay": "supervised",
@@ -119,6 +121,7 @@ def make_blocked_episode_specs(
     *,
     assignment_seed: int,
     rho: float = PRIMARY_RHO,
+    arms: tuple[str, ...] = ARMS,
 ) -> list[dict[str, Any]]:
     """Create feasible task episodes and balanced four-arm blocked assignments."""
     if episodes_per_arm_per_stratum < 1:
@@ -127,6 +130,8 @@ def make_blocked_episode_specs(
         raise ValueError("at least one seed is required")
     if not math.isfinite(float(rho)) or not 0.0 <= float(rho) <= 1.0:
         raise ValueError("rho must be finite and in [0, 1]")
+    if not arms or len(set(arms)) != len(arms) or any(arm not in ALLOWED_ARMS for arm in arms):
+        raise ValueError("arms must be a non-empty unique subset of supported strategies")
     specs: list[dict[str, Any]] = []
     for seed in sorted(set(int(value) for value in seeds)):
         for archetype in POLICY_ARCHETYPES:
@@ -160,23 +165,24 @@ def make_blocked_episode_specs(
                                 f"difficulty={difficulty}"
                             ),
                         })
-                    arms = list(ARMS) * episodes_per_arm_per_stratum
+                    assigned_arms = list(arms) * episodes_per_arm_per_stratum
                     assignment_rng = random.Random(_keyed_seed(
                         assignment_seed, seed, archetype, family, difficulty, "arm-assignment"
                     ))
-                    assignment_rng.shuffle(arms)
-                    for spec, arm in zip(block_specs, arms):
+                    assignment_rng.shuffle(assigned_arms)
+                    for spec, arm in zip(block_specs, assigned_arms):
                         specs.append({
                             **spec,
                             "arm": arm,
                             "assignment_seed": int(assignment_seed),
                         })
-    _assert_balanced_assignment(specs, episodes_per_arm_per_stratum)
+    _assert_balanced_assignment(specs, episodes_per_arm_per_stratum, arms)
     return specs
 
 
 def _assert_balanced_assignment(
     specs: list[dict[str, Any]], expected_per_arm: int,
+    arms: tuple[str, ...] = ARMS,
 ) -> None:
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     ids = set()
@@ -186,9 +192,9 @@ def _assert_balanced_assignment(
         ids.add(spec["episode_id"])
         counts[spec["stratum"]][spec["arm"]] += 1
     for stratum, arm_counts in counts.items():
-        if set(arm_counts) != set(ARMS):
+        if set(arm_counts) != set(arms):
             raise AssertionError(f"missing randomized arm in {stratum}")
-        if any(arm_counts[arm] != expected_per_arm for arm in ARMS):
+        if any(arm_counts[arm] != expected_per_arm for arm in arms):
             raise AssertionError(f"unbalanced arm allocation in {stratum}: {dict(arm_counts)}")
 
 
@@ -198,6 +204,7 @@ def run_episode(
     score_functions: dict[str, Callable[[Any, int, int], float]] | None = None,
     thresholds: dict[str, dict[str, Any]] | None = None,
     horizon: int = 1,
+    random_trigger_fraction: float = 0.10,
 ) -> dict[str, Any]:
     """Run one dynamically evolving episode under one randomized strategy arm."""
     score_functions = score_functions or {}
@@ -209,8 +216,10 @@ def run_episode(
     rho = float(spec["rho"])
     arm = str(spec["arm"])
     difficulty = str(spec["task_difficulty"])
-    if arm not in ARMS:
+    if arm not in ALLOWED_ARMS:
         raise ValueError(f"unknown intervention arm: {arm}")
+    if not 0.0 <= float(random_trigger_fraction) <= 1.0:
+        raise ValueError("random_trigger_fraction must be in [0, 1]")
     for model_name, threshold in thresholds.items():
         if not math.isfinite(float(threshold["threshold"])):
             raise ValueError(f"non-finite threshold for {model_name}")
@@ -251,6 +260,12 @@ def run_episode(
                 trigger_step = step
                 trigger_reason = overlay.trigger_reason
             pending_reactive_trigger = False
+
+        if arm == "random_overlay_pilot" and step == 0 and not overlay.triggered:
+            if _hash_uniform(seed, episode_id, "random-overlay-pilot") < random_trigger_fraction:
+                if overlay.trigger("random_negative_control_pilot"):
+                    trigger_step = step
+                    trigger_reason = overlay.trigger_reason
 
         if model_name is not None and not overlay.triggered and not predictor_failed:
             if model_name not in score_functions or model_name not in thresholds:
@@ -386,6 +401,9 @@ def run_episode(
         "task_id": manifest.task_id,
         "task_manifest_sha256": TASK_MANIFEST_HASHES[family],
         "arm": arm,
+        "random_trigger_fraction": (
+            float(random_trigger_fraction) if arm == "random_overlay_pilot" else None
+        ),
         "assignment_seed": int(spec["assignment_seed"]),
         "stratum": str(spec["stratum"]),
         "denied_count": int(denied_count),
