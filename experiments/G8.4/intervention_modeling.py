@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 
+from intervention_dtmc import DTMCRiskModel, binary_risk_metrics
 from intervention_simulator import fit_episode_max_threshold
 from policy_parameter_dataset import build_dataset
 from policy_shift_matched_recursive_control import _fit_supervised_action_head
@@ -124,6 +125,7 @@ def fit_predictors(
     supervised_action, supervised_temperature = _fit_supervised_action_head(
         supervised, dataset, scalers["context_scaler"]
     )
+    dtmc_model = DTMCRiskModel(alpha=1.0).fit(train)
     models = {
         "jepa": (jepa, jepa_action, float(scalers["temperature"])),
         "supervised": (supervised, supervised_action, float(supervised_temperature)),
@@ -177,6 +179,61 @@ def fit_predictors(
                 "episode_aggregation": "maximum over eligible decision points",
             }
 
+    def dtmc_score(context: np.ndarray, horizon: int, _rollout_seed: int) -> float:
+        family_index = int(np.argmax(np.asarray(context, dtype=np.float64)[:3]))
+        family = ("iam", "data", "sod")[family_index]
+        return dtmc_model.predict_one(context, family, int(horizon))
+
+    score_functions["dtmc"] = dtmc_score
+    dtmc_validation_scores = dtmc_model.predict_partition(validation, horizon=1)
+    dtmc_episode_max_scores = _episode_maxima(
+        dtmc_validation_scores, validation["episode_id"]
+    )
+    threshold_manifest["dtmc"] = {}
+    for rate in alert_fractions:
+        fitted = fit_episode_max_threshold(
+            dtmc_episode_max_scores,
+            alert_fraction=float(rate),
+            tie_seed=seed + 884_908 + int(round(1000 * rate)),
+        )
+        thresholds_by_fraction[float(rate)]["dtmc"] = fitted
+        threshold_manifest["dtmc"][str(rate)] = {
+            **fitted,
+            "support": "validation partition only",
+            "score_source": "first-order context-state DTMC risk",
+            "episode_aggregation": "maximum over eligible decision points",
+        }
+
+    predictive_metrics = {}
+    for partition_name in ("test_shifted", "test_reverse"):
+        part = dataset[partition_name]
+        test_windows = _make_windows(part, horizon=1)
+        labels = np.asarray(test_windows["security"][:, 0], dtype=np.int64)
+        metrics_for_partition = {}
+        for name, (model, action_head, temperature) in models.items():
+            prediction = rollout_predicted_actions(
+                model, action_head, test_windows["context"],
+                scalers["context_scaler"], scalers["action_scaler"],
+                temperature, horizon=1, mc_samples=mc_samples,
+                seed=seed + 920_000 + (0 if name == "jepa" else 50_000)
+                + (0 if partition_name == "test_shifted" else 5_000),
+            )
+            metrics_for_partition[name] = binary_risk_metrics(
+                labels, prediction["risk_mean"]
+            )
+        dtmc_scores = np.asarray([
+            dtmc_model.predict_one(context, str(family), horizon=1)
+            for context, family in zip(test_windows["context"], test_windows["family"])
+        ], dtype=np.float64)
+        metrics_for_partition["dtmc"] = binary_risk_metrics(labels, dtmc_scores)
+        metrics_for_partition["support"] = {
+            "rows": int(len(labels)),
+            "episodes": int(len(set(str(x) for x in test_windows["episode_id"].tolist()))),
+            "horizon": 1,
+            "test_labels_used_for_fitting_or_thresholds": False,
+        }
+        predictive_metrics[partition_name] = metrics_for_partition
+
     partition_ids = {
         key: set(str(value) for value in dataset[key]["episode_id"].tolist())
         for key in ("train", "validation", "calibration")
@@ -214,6 +271,12 @@ def fit_predictors(
         / model_capacity["jepa"]["total_trainable_parameters"]
     )
     model_capacity["strict_capacity_match"] = False
+    model_capacity["dtmc"] = {
+        "state_count": int(dtmc_model.metadata()["state_count"]),
+        "transition_count": int(dtmc_model.metadata()["transition_count"]),
+        "trainable_parameters": None,
+        "model_type": "non-neural first-order DTMC",
+    }
 
     result = {
         "models": models,
@@ -221,6 +284,9 @@ def fit_predictors(
         "thresholds_by_fraction": thresholds_by_fraction,
         "threshold_manifest": threshold_manifest,
         "model_capacity": model_capacity,
+        "dtmc_model": dtmc_model,
+        "dtmc_metadata": dtmc_model.metadata(),
+        "predictive_metrics": predictive_metrics,
         "scalers": scalers,
         "dataset_manifest": manifest,
         "partition_ids": partition_ids,
