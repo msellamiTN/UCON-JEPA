@@ -28,4 +28,20 @@ jobs:
         run: python -m unittest discover -v
       - name: Run focused randomized-intervention tests
         working-directory: experiments/G8.4
-        run: python -m unittest -v test_randomized_intervention_simulator.py
+        run: |
+          python -m unittest -v test_randomized_intervention_simulator.py
+          python -m unittest -v test_policy_shift_randomized_intervention.py
+      - name: Execute preregistered five-seed randomized intervention benchmark
+        working-directory: experiments/G8.4
+        run: |
+          python policy_shift_randomized_intervention.py \
+            --seeds 20261120,20261121,20261122,20261123,20261124 \
+            --episodes-per-cell 300 --epochs 180 --mc-samples 32 \
+            --pilot-episodes-per-stratum 40 \
+            --max-episodes-per-arm-per-stratum 300 \
+            --bootstrap-replicates 5000 --out randomized-intervention-output
+      - name: Retain randomized intervention evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-8-randomized-intervention
+          path: experiments/G8.4/randomized-intervention-output/
