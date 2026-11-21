@@ -146,7 +146,7 @@ def paired_action_branches(
         branches[action] = {
             "next_context": next_state,
             "ucon_verdict": policy_verdict(
-                family, action, next_state, exposure_threshold=exposure_threshold
+                family, action, x, exposure_threshold=exposure_threshold
             ),
             "exogenous_disturbance": eps.copy(),
         }
@@ -174,4 +174,8 @@ def factual_transition(
         second_order_interaction=second_order_interaction,
         exposure_threshold=exposure_threshold,
     )
-    return branches[action]
+    branch = branches[action]
+    return {
+        "next_context": branch["next_context"],
+        "ucon_verdict": branch["ucon_verdict"],
+    }
