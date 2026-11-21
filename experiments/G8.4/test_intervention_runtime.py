@@ -13,6 +13,11 @@ def manifest():
         base_capabilities=frozenset({"read", "write", "export", "admin"}),
         essential_capabilities=frozenset({"read", "write"}),
         restricted_capabilities=frozenset({"export", "admin"}),
+        task_id="unit-test-task",
+        family="unit-test",
+        task_intent="Exercise the capability overlay state machine",
+        completion_condition="test condition",
+        restriction_rationale="test-only restricted capabilities",
     )
 
 
@@ -23,6 +28,9 @@ class CapabilityManifestTests(unittest.TestCase):
                 frozenset({"read", "export"}),
                 frozenset({"read"}),
                 frozenset({"read"}),
+                task_id="invalid-overlap", family="test",
+                task_intent="test", completion_condition="test",
+                restriction_rationale="test",
             )
 
     def test_rejects_restricted_capability_outside_base(self):
@@ -31,21 +39,40 @@ class CapabilityManifestTests(unittest.TestCase):
                 frozenset({"read"}),
                 frozenset({"read"}),
                 frozenset({"export"}),
+                task_id="invalid-subset", family="test",
+                task_intent="test", completion_condition="test",
+                restriction_rationale="test",
             )
 
     def test_rejects_empty_or_invalid_names(self):
         with self.assertRaises(ValueError):
-            CapabilityManifest(frozenset({""}), frozenset(), frozenset())
+            CapabilityManifest(
+                frozenset({""}), frozenset(), frozenset(),
+                task_id="invalid-name", family="test", task_intent="test",
+                completion_condition="test", restriction_rationale="test",
+            )
 
     def test_rejects_mutable_capability_collections(self):
         with self.assertRaisesRegex(TypeError, "must be a frozenset"):
-            CapabilityManifest({"read"}, frozenset({"read"}), frozenset())
+            CapabilityManifest(
+                {"read"}, frozenset({"read"}), frozenset(),
+                task_id="mutable", family="test", task_intent="test",
+                completion_condition="test", restriction_rationale="test",
+            )
 
     def test_rejects_empty_base_and_non_intervenable_manifest(self):
         with self.assertRaisesRegex(ValueError, "base_capabilities must not be empty"):
-            CapabilityManifest(frozenset(), frozenset(), frozenset({"export"}))
+            CapabilityManifest(
+                frozenset(), frozenset(), frozenset({"export"}),
+                task_id="empty-base", family="test", task_intent="test",
+                completion_condition="test", restriction_rationale="test",
+            )
         with self.assertRaisesRegex(ValueError, "intervention-eligible"):
-            CapabilityManifest(frozenset({"read"}), frozenset({"read"}), frozenset())
+            CapabilityManifest(
+                frozenset({"read"}), frozenset({"read"}), frozenset(),
+                task_id="non-intervenable", family="test", task_intent="test",
+                completion_condition="test", restriction_rationale="test",
+            )
 
 
 class CapabilityOverlayTests(unittest.TestCase):
