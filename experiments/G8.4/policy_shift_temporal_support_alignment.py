@@ -206,11 +206,51 @@ def _stratified_episode_bootstrap(
     }
 
 
+def _assert_episode_disjoint(dataset: dict[str, Any]) -> None:
+    names = ("train", "validation", "calibration", "test_shifted", "test_reverse")
+    ids = {name: set(dataset[name]["episode_id"].tolist()) for name in names}
+    for index, left in enumerate(names):
+        for right in names[index + 1:]:
+            overlap = ids[left] & ids[right]
+            if overlap:
+                raise AssertionError(
+                    f"episode leakage between {left} and {right}: {len(overlap)} IDs"
+                )
+
+
+def _summarize_seed_runs(runs: dict[str, Any]) -> dict[str, Any]:
+    summary: dict[str, Any] = {}
+    for horizon in map(str, HORIZONS):
+        summary[horizon] = {}
+        for split in SPLITS:
+            summary[horizon][split] = {}
+            for model_name in ("JEPA_E2", "supervised_E2"):
+                model_summary: dict[str, Any] = {}
+                for condition in ("raw", "C0", "CP", "CA"):
+                    per_seed = []
+                    for run in runs.values():
+                        test = run["tests"][horizon][split]["models"][model_name]["test"]
+                        metrics = test["raw_metrics"] if condition == "raw" else test["calibrated"][condition]["metrics"]
+                        per_seed.append(metrics)
+                    metric_summary = {}
+                    for metric in ("auroc", "auprc", "brier", "ece_10"):
+                        values = [float(item[metric]) for item in per_seed if item.get("available", True) and metric in item]
+                        metric_summary[metric] = {
+                            "mean": float(np.mean(values)) if values else None,
+                            "sd_across_seeds": float(np.std(values, ddof=1)) if len(values) > 1 else None,
+                            "n_seeds": len(values),
+                        }
+                    model_summary[condition] = metric_summary
+                summary[horizon][split][model_name] = model_summary
+    return summary
+
+
 def _run_seed(
     seed: int, episodes_per_cell: int, epochs: int, mc_samples: int,
     bootstrap_replicates: int, output_dir: Path | None,
 ) -> dict[str, Any]:
     dataset = build_dataset(seed=seed, episodes_per_cell=episodes_per_cell)
+    _assert_episode_disjoint(dataset)
     if output_dir is not None:
         write_dataset(dataset, output_dir / f"dataset-{seed}")
 
@@ -307,6 +347,20 @@ def _run_seed(
                             )
                             for condition in ("C0", "CP", "CA")
                         },
+                        "per_position_by_archetype_family": {
+                            str(position): _group_metrics_safe(
+                                {key: value[windows["start_step"] == position] for key, value in windows.items()},
+                                truth[windows["start_step"] == position],
+                                {
+                                    "raw": raw[windows["start_step"] == position],
+                                    **{
+                                        name: prediction[windows["start_step"] == position]
+                                        for name, prediction in calibrated.items()
+                                    },
+                                },
+                            )
+                            for position in sorted(int(x) for x in np.unique(windows["start_step"]))
+                        },
                     },
                 }
                 if model_name == "JEPA_E2":
@@ -387,6 +441,7 @@ def main() -> None:
     result = {
         "benchmark": "G8.4.8.7.7 temporal-support alignment audit",
         "seeds": seeds,
+        "summary": _summarize_seed_runs(runs),
         "runs": runs,
         "protocol": {
             "horizons": list(HORIZONS),
