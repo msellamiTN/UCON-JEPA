@@ -64,6 +64,66 @@ class ContinuousSecurityContextTests(unittest.TestCase):
         self.assertEqual(policy_verdict("data", "export_sensitive", x), "DENY")
         self.assertEqual(policy_verdict("data", "export_sensitive", x, base_policy_allowed=False), "DENY")
 
+    def test_action_scaled_disturbance_creates_first_order_counterfactual_error(self):
+        state = np.array([0.2, 0.3, 0.4])
+        effects = []
+        for index in range(512):
+            eps = exogenous_disturbance(41, f"paired-{index}", 0)
+            factual = transition(state, "read_sensitive", eps, interaction=0.35)
+            alternative = transition(state, "export_sensitive", eps, interaction=0.35)
+            effects.append(alternative - factual)
+        variance = float(np.sum(np.var(np.asarray(effects), axis=0)))
+        self.assertGreater(variance, 0.0)
+
+    def test_first_order_interaction_variance_scales_quadratically_in_step_size(self):
+        state = np.array([0.2, 0.3, 0.4])
+        epsilons = [
+            exogenous_disturbance(53, f"scale-{index}", 0)
+            for index in range(512)
+        ]
+        variances = []
+        for h in (0.10, 0.05):
+            effects = [
+                transition(state, "export_sensitive", eps, step_size=h, interaction=0.4)
+                - transition(state, "read_sensitive", eps, step_size=h, interaction=0.4)
+                for eps in epsilons
+            ]
+            variances.append(float(np.sum(np.var(np.asarray(effects), axis=0))))
+        self.assertGreater(variances[0], 0.0)
+        self.assertAlmostEqual(variances[0] / variances[1], 4.0, delta=0.25)
+
+    def test_second_order_interaction_variance_scales_quartically_in_step_size(self):
+        state = np.array([0.2, 0.3, 0.4])
+        epsilons = [
+            exogenous_disturbance(67, f"second-order-{index}", 0)
+            for index in range(512)
+        ]
+        variances = []
+        for h in (0.10, 0.05):
+            effects = [
+                transition(
+                    state, "export_sensitive", eps, step_size=h,
+                    second_order_interaction=1.0,
+                )
+                - transition(
+                    state, "read_sensitive", eps, step_size=h,
+                    second_order_interaction=1.0,
+                )
+                for eps in epsilons
+            ]
+            variances.append(float(np.sum(np.var(np.asarray(effects), axis=0))))
+        self.assertGreater(variances[0], 0.0)
+        self.assertAlmostEqual(variances[0] / variances[1], 16.0, delta=1.0)
+
+    def test_factual_transition_does_not_expose_exogenous_disturbance(self):
+        from continuous_security_context import factual_transition
+
+        result = factual_transition(
+            np.array([0.2, 0.3, 0.4]), "data", "read_sensitive",
+            root_seed=13, parent_episode_id="factual-01", decision_step=0,
+        )
+        self.assertEqual(set(result), {"next_context", "ucon_verdict"})
+
     def test_rejects_cross_family_action_and_invalid_state(self):
         with self.assertRaisesRegex(ValueError, "supported by the task family"):
             paired_action_branches(
