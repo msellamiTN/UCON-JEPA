@@ -80,7 +80,7 @@ class RandomizedAssignmentTests(unittest.TestCase):
             arms=ARMS + PILOT_ONLY_ARMS,
         )
         self.assertEqual(set(spec["arm"] for spec in specs), set(ARMS + PILOT_ONLY_ARMS))
-        self.assertEqual(len(specs), 30 * 5)
+        self.assertEqual(len(specs), 30 * 6)
 
     def test_assignment_reproducibility(self):
         first = make_blocked_episode_specs(
@@ -156,6 +156,15 @@ class OverlayEpisodeTests(unittest.TestCase):
         self.assertEqual(selected["overlay_trigger_step"], 0)
         self.assertEqual(selected["overlay_trigger_reason"], "random_negative_control_pilot")
         self.assertFalse(not_selected["overlay_triggered"])
+
+    def test_dtmc_overlay_is_pilot_only_and_uses_dtmc_score(self):
+        result = run_episode(
+            _spec(arm="dtmc_overlay_pilot"),
+            score_functions={"dtmc": lambda _context, _horizon, _seed: 0.9},
+            thresholds={"dtmc": {"threshold": 0.5, "tie_fraction": 1.0}},
+        )
+        self.assertEqual(result["overlay_trigger_step"], 0)
+        self.assertEqual(result["overlay_trigger_reason"], "dtmc_risk_threshold")
 
     def test_predictor_failure_falls_back_to_ucon_only_episode_behavior(self):
         baseline = run_episode(_spec(arm="ucon_only"))
