@@ -139,6 +139,8 @@ def run_pilot(
         checkpoint_sha = save_model_checkpoint(
             checkpoint_path, fitted["models"], fitted["scalers"]
         )
+        dtmc_path = output / "models" / f"seed_{seed}_dtmc.json"
+        dtmc_sha = _write_json(dtmc_path, fitted["dtmc_model"].to_dict())
         thresholds = fitted["thresholds_by_fraction"][threshold_fraction]
         seed_rows = []
         seed_assignments = []
@@ -166,6 +168,10 @@ def run_pilot(
         seed_metadata[str(seed)] = {
             "checkpoint": str(checkpoint_path.relative_to(output)),
             "checkpoint_sha256": checkpoint_sha,
+            "dtmc_model": str(dtmc_path.relative_to(output)),
+            "dtmc_model_sha256": dtmc_sha,
+            "dtmc_metadata": fitted["dtmc_metadata"],
+            "predictive_metrics": fitted["predictive_metrics"],
             "assignment_manifest": str(assignment_path.relative_to(output)),
             "assignment_manifest_sha256": assignment_sha,
             "dataset_manifest": fitted["dataset_manifest"],
