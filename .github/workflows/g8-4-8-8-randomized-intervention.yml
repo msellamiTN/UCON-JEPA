@@ -44,6 +44,7 @@ jobs:
             --episodes-per-cell 300 --epochs 180 --mc-samples 32 \
             --pilot-episodes-per-stratum 40 \
             --max-episodes-per-arm-per-stratum 300 \
+            --power-simulation-replicates 5000 \
             --bootstrap-replicates 5000 --out randomized-intervention-output
       - name: Retain randomized intervention evidence
         uses: actions/upload-artifact@v4
