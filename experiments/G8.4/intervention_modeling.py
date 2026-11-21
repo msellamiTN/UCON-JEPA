@@ -60,6 +60,20 @@ def save_model_checkpoint(
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _trainable_parameter_count(model: Any) -> int:
+    if hasattr(model, "parameter_count"):
+        value = model.parameter_count
+        return int(value() if callable(value) else value)
+    total = 0
+    for name in ("weights", "bias"):
+        value = getattr(model, name, None)
+        if isinstance(value, np.ndarray):
+            total += int(value.size)
+    if total == 0:
+        raise TypeError(f"cannot determine trainable parameter count for {type(model).__name__}")
+    return total
+
+
 def _episode_maxima(
     scores: np.ndarray,
     episode_ids: np.ndarray,
@@ -189,10 +203,10 @@ def fit_predictors(
     model_capacity = {}
     for name, (model, action_head, _temperature) in models.items():
         model_capacity[name] = {
-            "dynamics_parameters": int(model.parameter_count()),
-            "action_head_parameters": int(action_head.parameter_count()),
+            "dynamics_parameters": _trainable_parameter_count(model),
+            "action_head_parameters": _trainable_parameter_count(action_head),
             "total_trainable_parameters": int(
-                model.parameter_count() + action_head.parameter_count()
+                _trainable_parameter_count(model) + _trainable_parameter_count(action_head)
             ),
         }
     model_capacity["supervised_to_jepa_parameter_ratio"] = (
