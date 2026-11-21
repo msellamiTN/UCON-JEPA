@@ -464,6 +464,9 @@ def _native(value: Any) -> Any:
 def _collect_arrays(prefix: str, value: Any, output: dict[str, np.ndarray]) -> None:
     if isinstance(value, np.ndarray):
         output[prefix] = value
+    elif isinstance(value, dict):
+        for name, item in value.items():
+            _collect_arrays(f"{prefix}_{name}", item, output)
     elif isinstance(value, (tuple, list)):
         for index, item in enumerate(value):
             _collect_arrays(f"{prefix}_{index}", item, output)
@@ -572,6 +575,8 @@ def main() -> None:
                 name: {
                     "parameter_count": int(model.parameter_count()),
                     "latent_dim": int(model.config.latent_dim),
+                    "action_head_selected_epoch": int(getattr(_head, "best_epoch", 0)),
+                    "action_temperature": float(_temp),
                 }
                 for name, (model, _head, _temp) in models.items()
             },
