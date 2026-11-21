@@ -7,10 +7,7 @@ on:
     paths:
       - "experiments/G8.4/**"
       - ".github/workflows/g8-4-8-3-1-multiseed-action-validation.yml"
-  pull_request:
-    paths:
-      - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-8-3-1-multiseed-action-validation.yml"
+
   workflow_dispatch:
 
 jobs:

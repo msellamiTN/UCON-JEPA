@@ -2,15 +2,11 @@ name: G8.4.3 Stateful Trajectory Dataset
 on:
   push:
     branches:
-      - main
       - research/g8.4.3-stateful-trajectory-dataset
     paths:
       - "experiments/G8.4/**"
       - ".github/workflows/g8-4-3-trajectory-data.yml"
-  pull_request:
-    paths:
-      - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-3-trajectory-data.yml"
+
   workflow_dispatch:
 
 jobs:

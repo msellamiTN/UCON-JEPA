@@ -2,17 +2,12 @@ name: G8.4.1 JEPA Role Contract
 on:
   push:
     branches:
-      - main
       - research/g8.4.1-jepa-role-contract
     paths:
       - "experiments/G8.4/**"
       - "docs/research/G8.4.1_JEPA_ROLE_CONTRACT.md"
       - ".github/workflows/g8-4-1-jepa-role-contract.yml"
-  pull_request:
-    paths:
-      - "experiments/G8.4/**"
-      - "docs/research/G8.4.1_JEPA_ROLE_CONTRACT.md"
-      - ".github/workflows/g8-4-1-jepa-role-contract.yml"
+
   workflow_dispatch:
 
 jobs:

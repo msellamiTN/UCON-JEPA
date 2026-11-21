@@ -1,0 +1,77 @@
+name: G8.4.8.8 Confirmatory Statistical Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmatory_run_id:
+        description: Completed power-gated confirmatory trial run ID
+        required: true
+      power_run_id:
+        description: Completed max-t power-gate run ID used by the confirmatory trial
+        required: true
+      bootstrap_replicates:
+        description: Stratified episode-bootstrap replicates
+        required: true
+        default: "10000"
+      randomization_replicates:
+        description: Blocked randomization-inference replicates
+        required: true
+        default: "100000"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  analyze-confirmatory-trial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install experiment dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run complete G8.4 regression suite
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Verify upstream trial and power workflows completed successfully
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run view '${{ inputs.confirmatory_run_id }}' --json name,conclusion > confirmatory-run-status.json
+          gh run view '${{ inputs.power_run_id }}' --json name,conclusion > power-run-status.json
+          jq -e '.name == "G8.4.8.8 Power-Gated Confirmatory Trial" and .conclusion == "success"' confirmatory-run-status.json
+          jq -e '.name == "G8.4.8.8 Blinded-Pilot Max-t Power Gate" and .conclusion == "success"' power-run-status.json
+      - name: Download confirmatory trial artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: g8-4-8-8-confirmatory-trial
+          path: trial-artifact
+          run-id: ${{ inputs.confirmatory_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download approved power report
+        uses: actions/download-artifact@v4
+        with:
+          name: g8-4-8-8-max-t-power-gate
+          path: power-artifact
+          run-id: ${{ inputs.power_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run preregistered simultaneous bootstrap and randomization analysis
+        working-directory: experiments/G8.4
+        run: |
+          python intervention_analysis.py \
+            --trial-dir '../../trial-artifact' \
+            --power-report '../../power-artifact/sample_size_gate.json' \
+            --bootstrap-replicates '${{ inputs.bootstrap_replicates }}' \
+            --randomization-replicates '${{ inputs.randomization_replicates }}' \
+            --out intervention-analysis-output
+      - name: Retain statistical report and block tables
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-8-confirmatory-analysis
+          path: experiments/G8.4/intervention-analysis-output/
