@@ -37,6 +37,8 @@ class CapabilityManifest:
             ("essential_capabilities", self.essential_capabilities),
             ("restricted_capabilities", self.restricted_capabilities),
         ):
+            if not isinstance(values, frozenset):
+                raise TypeError(f"{field_name} must be a frozenset")
             if any(not isinstance(value, str) or not value.strip() for value in values):
                 raise ValueError(f"{field_name} must contain non-empty strings")
         if not self.essential_capabilities <= self.base_capabilities:
