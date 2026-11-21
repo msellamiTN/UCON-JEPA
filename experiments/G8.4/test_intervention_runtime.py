@@ -114,6 +114,35 @@ class CapabilityOverlayTests(unittest.TestCase):
         self.assertFalse(decision.may_execute)
         overlay.end_decision()
 
+    def test_invalid_ucon_verdict_fails_closed(self):
+        overlay = CapabilityOverlay(manifest())
+        overlay.begin_decision()
+        decision = overlay.evaluate_proposal("read", lambda _: "PERMIT")
+        self.assertEqual(decision.outcome, ProposalOutcome.UCON_FAILURE_DENY)
+        self.assertFalse(decision.may_execute)
+        overlay.end_decision()
+
+    def test_current_ucon_policy_is_rechecked_after_policy_change(self):
+        overlay = CapabilityOverlay(manifest())
+        state = {"permitted": True}
+        overlay.begin_decision()
+        first = overlay.evaluate_proposal(
+            "read",
+            lambda _: UCONVerdict.PERMIT if state["permitted"] else UCONVerdict.DENY,
+        )
+        self.assertEqual(first.outcome, ProposalOutcome.READY)
+        overlay.end_decision()
+
+        state["permitted"] = False
+        overlay.begin_decision()
+        second = overlay.evaluate_proposal(
+            "read",
+            lambda _: UCONVerdict.PERMIT if state["permitted"] else UCONVerdict.DENY,
+        )
+        self.assertEqual(second.outcome, ProposalOutcome.DENIED_BY_UCON)
+        self.assertFalse(second.may_execute)
+        overlay.end_decision()
+
     def test_unknown_or_restricted_proposal_cannot_become_executable(self):
         overlay = CapabilityOverlay(manifest())
         overlay.begin_decision()
