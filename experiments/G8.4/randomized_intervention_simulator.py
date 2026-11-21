@@ -259,6 +259,16 @@ def run_episode(
         row["eligible"] and row["original_action_denied"] for row in records
     )
     eligible_count = sum(row["eligible"] for row in records)
+    warning_lead_times = []
+    for warning_row in (row for row in records if row["warning"]):
+        later_denials = [
+            row["step"] for row in records
+            if row["step"] > warning_row["step"] and not row["ucon_allowed"]
+        ]
+        warning_lead_times.append(
+            int(min(later_denials) - warning_row["step"]) if later_denials else None
+        )
+    observed_leads = [value for value in warning_lead_times if value is not None]
     distinct_actions = len(set(row["proposed_action"] for row in records))
     repeat_attempts = sum(
         records[i]["proposed_action"] == records[i - 1]["proposed_action"]
@@ -287,6 +297,13 @@ def run_episode(
             float(warning_true_positive / warning_positive)
             if horizon == 1 and warning_positive else None
         ),
+        "warning_followed_by_deny_rate": (
+            float(len(observed_leads) / warnings) if warnings else None
+        ),
+        "mean_warning_lead_time_steps": (
+            float(np.mean(observed_leads)) if observed_leads else None
+        ),
+        "warning_lead_times": warning_lead_times,
         "distinct_action_count": int(distinct_actions),
         "repeat_after_deny_count": int(repeat_attempts),
         "state_violation_count": int(sum(row["state_violation"] for row in records)),
