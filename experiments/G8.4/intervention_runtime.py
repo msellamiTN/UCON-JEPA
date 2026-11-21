@@ -76,6 +76,7 @@ class CapabilityOverlay:
         self._duration = duration_decisions
         self._remaining = 0
         self._triggered = False
+        self._trigger_reason: str | None = None
         self._decision_open = False
         self._current_available: FrozenSet[str] = manifest.base_capabilities
 
@@ -91,6 +92,10 @@ class CapabilityOverlay:
     def remaining_decisions(self) -> int:
         return self._remaining
 
+    @property
+    def trigger_reason(self) -> str | None:
+        return self._trigger_reason
+
     def trigger(self, reason: str) -> bool:
         """Activate once per episode; duplicate triggers never extend duration."""
         if not isinstance(reason, str) or not reason.strip():
@@ -100,6 +105,7 @@ class CapabilityOverlay:
         if self._triggered:
             return False
         self._triggered = True
+        self._trigger_reason = reason
         self._remaining = self._duration
         return True
 
