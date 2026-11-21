@@ -533,8 +533,10 @@ def main() -> None:
         }
     episode_artifact = args.out / "episode_results.jsonl.gz"
     assignment_artifact = args.out / "randomization_manifest.jsonl.gz"
+    pilot_artifact = args.out / "validation_pilot_results.jsonl.gz"
     episode_sha = _write_jsonl_gzip(episode_artifact, all_results)
     assignment_sha = _write_jsonl_gzip(assignment_artifact, assignments)
+    pilot_sha = _write_jsonl_gzip(pilot_artifact, pilot_rows)
     result = {
         "benchmark": "G8.4.8.8 randomized predictive-intervention utility",
         "protocol_version": "g8.4.8.8-v1",
@@ -544,6 +546,8 @@ def main() -> None:
         "all_arm_descriptives": arm_summaries,
         "stratified_cohort_descriptives": _cohort_descriptives(all_results),
         "q0_exact_negative_control_replays": q0_checks,
+        "validation_pilot_descriptives": _cohort_descriptives(pilot_rows),
+        "retained_pilot_artifact": {"file": pilot_artifact.name, "sha256": pilot_sha},
         "calibration": {
             str(seed): per_seed[seed]["calibration"] for seed in seeds
         },
@@ -568,6 +572,7 @@ def main() -> None:
             output.name: digest,
             episode_artifact.name: episode_sha,
             assignment_artifact.name: assignment_sha,
+            pilot_artifact.name: pilot_sha,
         },
         "seeds": seeds, "power_gate": _native(power),
         "thresholds_frozen_before_confirmatory_episode_generation": True,
