@@ -582,7 +582,8 @@ def main() -> None:
     (args.out / "MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     (args.out / "SHA256SUMS.txt").write_text(
         f"{digest}  {output.name}\n{episode_sha}  {episode_artifact.name}\n"
-        f"{assignment_sha}  {assignment_artifact.name}\n", encoding="utf-8"
+        f"{assignment_sha}  {assignment_artifact.name}\n"
+        f"{pilot_sha}  {pilot_artifact.name}\n", encoding="utf-8"
     )
     print(json.dumps({
         "output": str(output), "sha256": digest,
