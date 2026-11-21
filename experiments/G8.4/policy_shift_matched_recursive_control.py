@@ -76,6 +76,81 @@ def _predict_e2(
     }
 
 
+def _decision_time_mask(windows: dict[str, np.ndarray]) -> np.ndarray:
+    """Select exactly one step-0 forecast window per complete episode."""
+    mask = np.asarray(windows["start_step"]) == 0
+    if not np.any(mask):
+        raise ValueError("decision-time evaluation requires step-0 windows")
+    selected_ids = windows["episode_id"][mask].tolist()
+    all_ids = set(windows["episode_id"].tolist())
+    if len(selected_ids) != len(set(selected_ids)) or set(selected_ids) != all_ids:
+        raise ValueError("expected exactly one step-0 window for every episode")
+    return mask
+
+
+def _stratified_paired_loss_bootstrap(
+    jepa_loss: np.ndarray,
+    supervised_loss: np.ndarray,
+    episode_ids: np.ndarray,
+    archetypes: np.ndarray,
+    families: np.ndarray,
+    seed: int,
+    replicates: int,
+) -> dict[str, Any]:
+    """Post-hoc sensitivity bootstrap preserving the fixed archetype/family allocation.
+
+    The pre-registered pooled whole-episode bootstrap remains the primary interval.
+    This sensitivity resamples episodes independently within each of the 15 fixed
+    behavior-archetype × security-family cells, retaining each cell's sample size.
+    """
+    jepa_loss = np.asarray(jepa_loss, dtype=np.float64)
+    supervised_loss = np.asarray(supervised_loss, dtype=np.float64)
+    episode_ids = np.asarray(episode_ids)
+    archetypes = np.asarray(archetypes)
+    families = np.asarray(families)
+    n = len(episode_ids)
+    if not (len(jepa_loss) == len(supervised_loss) == len(archetypes) == len(families) == n):
+        raise ValueError("losses, episode IDs, and strata must have equal lengths")
+    if n == 0 or len(set(episode_ids.tolist())) != n:
+        raise ValueError("stratified primary bootstrap requires one row per episode")
+    if replicates < 1:
+        raise ValueError("replicates must be positive")
+
+    grouped_indices: dict[tuple[str, str], list[int]] = {}
+    for index, (archetype, family) in enumerate(zip(archetypes, families)):
+        key = (str(archetype), str(family))
+        grouped_indices.setdefault(key, []).append(index)
+    if len(grouped_indices) != 15:
+        raise ValueError(f"expected 15 archetype/family strata, found {len(grouped_indices)}")
+
+    differences = jepa_loss - supervised_loss
+    rng = np.random.default_rng(seed)
+    bootstrap_means = np.zeros(replicates, dtype=np.float64)
+    allocation = {}
+    for key in sorted(grouped_indices):
+        indices = np.asarray(grouped_indices[key], dtype=np.int64)
+        values = differences[indices]
+        draws = rng.integers(0, len(values), size=(replicates, len(values)))
+        stratum_means = values[draws].mean(axis=1)
+        bootstrap_means += (len(indices) / n) * stratum_means
+        allocation[f"{key[0]}::{key[1]}"] = len(indices)
+
+    return {
+        "unit": "whole episode within fixed archetype/family stratum",
+        "strata": len(grouped_indices),
+        "episode_allocation": allocation,
+        "episodes": n,
+        "replicates": replicates,
+        "jepa_minus_supervised_mean": float(differences.mean()),
+        "ci95_percentile": [
+            float(np.quantile(bootstrap_means, 0.025)),
+            float(np.quantile(bootstrap_means, 0.975)),
+        ],
+        "negative_favours_JEPA": True,
+        "status": "post-hoc sensitivity; pre-registered pooled episode bootstrap remains primary",
+    }
+
+
 def _run_one_seed(
     seed: int,
     episodes_per_cell: int,
@@ -163,44 +238,117 @@ def _run_one_seed(
                 split_raw[name] = prediction
 
             train_windows = _make_windows(dataset["train"], horizon)
-            prevalence = float(
+            all_window_prevalence = float(
                 train_windows["security"][:, :, 0].max(axis=1).mean()
             )
-            baseline = np.full(len(truth), prevalence, dtype=np.float64)
+            all_window_baseline = np.full(
+                len(truth), all_window_prevalence, dtype=np.float64
+            )
             all_predictions = {
-                "train_prevalence": baseline,
+                "train_prevalence": all_window_baseline,
                 **split_predictions,
             }
-            jepa_loss = (split_predictions["JEPA_E2"] - truth) ** 2
-            supervised_loss = (split_predictions["supervised_E2"] - truth) ** 2
+
+            # Primary estimand: a forecast made at the episode's decision time.
+            # Calibration also uses exactly one start_step=0 window per episode.
+            decision_mask = _decision_time_mask(windows)
+            train_decision_mask = _decision_time_mask(train_windows)
+            decision_truth = truth[decision_mask]
+            decision_episode_ids = windows["episode_id"][decision_mask]
+            decision_windows = {
+                key: value[decision_mask] for key, value in windows.items()
+            }
+            decision_train_prevalence = float(
+                train_windows["security"][train_decision_mask, :, 0]
+                .max(axis=1).mean()
+            )
+            decision_predictions = {
+                "train_prevalence": np.full(
+                    len(decision_truth), decision_train_prevalence, dtype=np.float64
+                ),
+                **{
+                    name: prediction[decision_mask]
+                    for name, prediction in split_predictions.items()
+                },
+            }
+            jepa_decision_loss = (
+                decision_predictions["JEPA_E2"] - decision_truth
+            ) ** 2
+            supervised_decision_loss = (
+                decision_predictions["supervised_E2"] - decision_truth
+            ) ** 2
+
             tests[split_name][str(horizon)] = {
                 "target": "any formal UCON DENY across the next H transitions",
                 "rho": sorted(set(float(x) for x in dataset[split_name]["rho"].tolist())),
-                "windows": int(len(truth)),
-                "episodes": int(len(set(windows["episode_id"].tolist()))),
-                "prevalence": float(truth.mean()),
-                "train_horizon_prevalence": prevalence,
-                "metrics": {
-                    name: __import__("predictive_benchmark").metrics(truth, pred)
-                    for name, pred in all_predictions.items()
-                },
-                "paired_episode_bootstrap_JEPA_minus_supervised_Brier": {
-                    **_paired_loss_bootstrap(
-                        jepa_loss, supervised_loss, windows["episode_id"],
-                        seed + horizon * 1000
-                        + (0 if split_name == "test_shifted" else 900_000),
-                        bootstrap_replicates,
+                "decision_time_primary": {
+                    "population": "exactly one start_step=0 forecast window per episode",
+                    "calibration_population": "exactly one start_step=0 window per nominal-support calibration episode",
+                    "windows": int(len(decision_truth)),
+                    "episodes": int(len(set(decision_episode_ids.tolist()))),
+                    "prevalence": float(decision_truth.mean()),
+                    "train_horizon_prevalence": decision_train_prevalence,
+                    "metrics": {
+                        name: __import__("predictive_benchmark").metrics(
+                            decision_truth, pred
+                        )
+                        for name, pred in decision_predictions.items()
+                    },
+                    "paired_episode_bootstrap_JEPA_minus_supervised_Brier": {
+                        **_paired_loss_bootstrap(
+                            jepa_decision_loss, supervised_decision_loss,
+                            decision_episode_ids,
+                            seed + horizon * 1000
+                            + (0 if split_name == "test_shifted" else 900_000),
+                            bootstrap_replicates,
+                        ),
+                        "negative_favours_JEPA": True,
+                    },
+                    "stratified_sensitivity_bootstrap_JEPA_minus_supervised_Brier": (
+                        _stratified_paired_loss_bootstrap(
+                            jepa_decision_loss, supervised_decision_loss,
+                            decision_episode_ids,
+                            decision_windows["agent_policy"],
+                            decision_windows["family"],
+                            seed + horizon * 2000
+                            + (0 if split_name == "test_shifted" else 1_800_000),
+                            bootstrap_replicates,
+                        )
                     ),
-                    "negative_favours_JEPA": True,
+                    "by_archetype_family": _group_metrics(
+                        decision_windows, decision_truth, decision_predictions
+                    ),
                 },
-                "by_archetype_family": _group_metrics(
-                    windows, truth, all_predictions
-                ),
+                "secondary_all_windows": {
+                    "population": "all overlapping sliding windows; descriptive secondary analysis only",
+                    "windows": int(len(truth)),
+                    "episodes": int(len(set(windows["episode_id"].tolist()))),
+                    "prevalence": float(truth.mean()),
+                    "train_horizon_prevalence": all_window_prevalence,
+                    "metrics": {
+                        name: __import__("predictive_benchmark").metrics(truth, pred)
+                        for name, pred in all_predictions.items()
+                    },
+                    "paired_episode_bootstrap_JEPA_minus_supervised_Brier": {
+                        **_paired_loss_bootstrap(
+                            (split_predictions["JEPA_E2"] - truth) ** 2,
+                            (split_predictions["supervised_E2"] - truth) ** 2,
+                            windows["episode_id"],
+                            seed + horizon * 1000 + 1_500_000
+                            + (0 if split_name == "test_shifted" else 900_000),
+                            bootstrap_replicates,
+                        ),
+                        "negative_favours_JEPA": True,
+                    },
+                    "by_archetype_family": _group_metrics(
+                        windows, truth, all_predictions
+                    ),
+                },
                 "uncertainty": {
                     name: {
-                        "mean_mc_std": float(split_raw[name]["risk_std"].mean()),
-                        "mean_raw_q05": float(split_raw[name]["risk_q05"].mean()),
-                        "mean_raw_q95": float(split_raw[name]["risk_q95"].mean()),
+                        "mean_mc_std": float(split_raw[name]["risk_std"][decision_mask].mean()),
+                        "mean_raw_q05": float(split_raw[name]["risk_q05"][decision_mask].mean()),
+                        "mean_raw_q95": float(split_raw[name]["risk_q95"][decision_mask].mean()),
                     }
                     for name in models
                 },
@@ -267,7 +415,7 @@ def _summarize(runs: dict[str, Any]) -> dict[str, Any]:
             summary[split][horizon] = {}
             for method in ("train_prevalence", "JEPA_E2", "supervised_E2"):
                 values = [
-                    run["tests"][split][horizon]["metrics"][method]
+                    run["tests"][split][horizon]["decision_time_primary"]["metrics"][method]
                     for run in runs.values()
                 ]
                 summary[split][horizon][method] = {
@@ -301,7 +449,7 @@ def main() -> None:
         for seed in seeds
     }
     result = {
-        "benchmark": "G8.4.8.7.5 matched JEPA vs supervised recursive risk control",
+        "benchmark": "G8.4.8.7.7 decision-time matched recursive JEPA vs supervised evaluation",
         "seeds": seeds,
         "runs": runs,
         "summary": _summarize(runs),
@@ -311,8 +459,12 @@ def main() -> None:
             "test_reverse_rho": 0.05,
             "horizons": list(HORIZONS),
             "episodes_per_cell": args.episodes_per_cell,
-            "primary_contrast": "JEPA_E2 minus supervised_E2 Brier; negative favours JEPA",
-            "bootstrap_unit": "whole episode",
+            "primary_population": "one start_step=0 window per test episode; same one-window-per-episode rule as risk calibration",
+            "secondary_population": "all overlapping sliding windows; descriptive only",
+            "primary_contrast": "decision-time JEPA_E2 minus supervised_E2 Brier; negative favours JEPA",
+            "bootstrap_unit": "whole episode; exactly one primary window per episode",
+            "primary_bootstrap": "pre-registered pooled whole-episode bootstrap",
+            "sensitivity_bootstrap": "post-hoc within-archetype/family stratified whole-episode bootstrap preserving fixed 15-cell allocation",
             "bootstrap_replicates": args.bootstrap_replicates,
         },
         "limitations": [

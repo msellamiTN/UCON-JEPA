@@ -5,7 +5,10 @@ import numpy as np
 
 from jepa_numpy import JEPAConfig, LinearActionConditionedJEPA
 from policy_shift_supervised_state_dynamics import LinearSupervisedStateDynamics
-from policy_shift_matched_recursive_control import _run_one_seed, _predict_e2
+from policy_shift_matched_recursive_control import (
+    _run_one_seed, _predict_e2, _decision_time_mask,
+    _stratified_paired_loss_bootstrap,
+)
 
 
 class MatchedRecursiveControlTests(unittest.TestCase):
@@ -52,6 +55,29 @@ class MatchedRecursiveControlTests(unittest.TestCase):
         self.assertNotIn("security_targets", params)
         self.assertNotIn("realized_future_actions", params)
 
+
+    def test_decision_time_mask_selects_one_window_per_episode(self):
+        windows = {
+            "start_step": np.asarray([0, 1, 2, 0, 1]),
+            "episode_id": np.asarray(["a", "a", "a", "b", "b"]),
+        }
+        mask = _decision_time_mask(windows)
+        np.testing.assert_array_equal(mask, np.asarray([True, False, False, True, False]))
+
+    def test_decision_time_mask_rejects_missing_or_duplicate_episode_starts(self):
+        missing = {
+            "start_step": np.asarray([1, 2, 0]),
+            "episode_id": np.asarray(["a", "a", "b"]),
+        }
+        duplicate = {
+            "start_step": np.asarray([0, 0, 1]),
+            "episode_id": np.asarray(["a", "a", "a"]),
+        }
+        with self.assertRaises(ValueError):
+            _decision_time_mask(missing)
+        with self.assertRaises(ValueError):
+            _decision_time_mask(duplicate)
+
     def test_small_matched_recursive_benchmark(self):
         result = _run_one_seed(
             seed=20261120,
@@ -72,18 +98,71 @@ class MatchedRecursiveControlTests(unittest.TestCase):
         for split, horizons in result["tests"].items():
             self.assertEqual(set(horizons), {"1", "2", "4", "8"})
             for report in horizons.values():
-                self.assertGreater(report["windows"], 0)
+                primary = report["decision_time_primary"]
+                self.assertGreater(primary["windows"], 0)
+                self.assertEqual(primary["windows"], primary["episodes"])
                 self.assertEqual(
-                    set(report["metrics"]),
+                    primary["population"],
+                    "exactly one start_step=0 forecast window per episode",
+                )
+                self.assertEqual(
+                    set(primary["metrics"]),
                     {"train_prevalence", "JEPA_E2", "supervised_E2"},
                 )
-                for method in report["metrics"].values():
+                self.assertEqual(
+                    primary["paired_episode_bootstrap_JEPA_minus_supervised_Brier"]["episodes"],
+                    primary["episodes"],
+                )
+                self.assertEqual(
+                    report["secondary_all_windows"]["population"],
+                    "all overlapping sliding windows; descriptive secondary analysis only",
+                )
+                for method in primary["metrics"].values():
                     for key in ("auroc", "auprc", "brier", "ece_10"):
                         self.assertTrue(np.isfinite(method[key]))
-                boot = report["paired_episode_bootstrap_JEPA_minus_supervised_Brier"]
+                boot = primary["paired_episode_bootstrap_JEPA_minus_supervised_Brier"]
                 self.assertEqual(boot["unit"], "whole episode")
                 self.assertEqual(boot["replicates"], 100)
                 self.assertEqual(len(boot["ci95_percentile"]), 2)
+
+
+    def test_stratified_bootstrap_preserves_all_fifteen_fixed_cells(self):
+        archetypes = np.asarray([
+            policy for policy in (
+                "goal_directed", "uniform", "retrying_adversary",
+                "prerequisite_blind_planner", "denial_adaptive_explorer",
+            ) for _family in ("iam", "data", "sod") for _ in range(2)
+        ])
+        families = np.asarray([
+            family for _policy in range(5)
+            for family in ("iam", "data", "sod") for _ in range(2)
+        ])
+        episode_ids = np.asarray([f"episode-{i}" for i in range(30)])
+        jepa_loss = np.linspace(0.1, 0.4, 30)
+        supervised_loss = np.linspace(0.2, 0.3, 30)
+        result = _stratified_paired_loss_bootstrap(
+            jepa_loss, supervised_loss, episode_ids, archetypes, families,
+            seed=7, replicates=250,
+        )
+        self.assertEqual(result["strata"], 15)
+        self.assertEqual(result["episodes"], 30)
+        self.assertEqual(result["replicates"], 250)
+        self.assertEqual(set(result["episode_allocation"].values()), {2})
+        self.assertAlmostEqual(
+            result["jepa_minus_supervised_mean"],
+            float(np.mean(jepa_loss - supervised_loss)),
+        )
+        self.assertEqual(
+            result["status"],
+            "post-hoc sensitivity; pre-registered pooled episode bootstrap remains primary",
+        )
+        duplicate_episode_ids = episode_ids.copy()
+        duplicate_episode_ids[-1] = duplicate_episode_ids[0]
+        with self.assertRaisesRegex(ValueError, "one row per episode"):
+            _stratified_paired_loss_bootstrap(
+                jepa_loss, supervised_loss, duplicate_episode_ids,
+                archetypes, families, seed=7, replicates=10,
+            )
 
 
 if __name__ == "__main__":
