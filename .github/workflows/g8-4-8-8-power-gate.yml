@@ -37,6 +37,8 @@ jobs:
   max-t-power-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    env:
+      UCON_JEPA_HEAD_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
