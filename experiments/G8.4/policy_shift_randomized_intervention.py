@@ -518,6 +518,12 @@ def _cohort_descriptives(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "mean_warning_rate": float(np.mean([x["warning_rate"] for x in values])),
             "mean_warning_precision": _mean_defined([x["warning_precision"] for x in values]),
             "mean_warning_recall": _mean_defined([x["warning_recall"] for x in values]),
+            "mean_warning_followed_by_deny_rate": _mean_defined([
+                x["warning_followed_by_deny_rate"] for x in values
+            ]),
+            "mean_warning_lead_time_steps": _mean_defined([
+                x["mean_warning_lead_time_steps"] for x in values
+            ]),
             "mean_revision_count": float(np.mean([x["revision_count"] for x in values])),
             "mean_distinct_action_count": float(np.mean([x["distinct_action_count"] for x in values])),
             "mean_repeat_after_deny_count": float(np.mean([x["repeat_after_deny_count"] for x in values])),
