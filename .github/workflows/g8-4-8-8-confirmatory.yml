@@ -48,6 +48,12 @@ jobs:
       - name: Run complete G8.4 regression suite
         working-directory: experiments/G8.4
         run: python -m unittest discover -v
+      - name: Verify max-t power gate completed successfully
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run view '${{ inputs.power_run_id }}' --json name,conclusion > power-run-status.json
+          jq -e '.name == "G8.4.8.8 Blinded-Pilot Max-t Power Gate" and .conclusion == "success"' power-run-status.json
       - name: Download approved max-t power report
         uses: actions/download-artifact@v4
         with:
