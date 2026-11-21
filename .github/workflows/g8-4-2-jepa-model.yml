@@ -2,15 +2,11 @@ name: G8.4.2 JEPA Model
 on:
   push:
     branches:
-      - main
       - research/g8.4.2-linear-action-conditioned-jepa
     paths:
       - "experiments/G8.4/**"
       - ".github/workflows/g8-4-2-jepa-model.yml"
-  pull_request:
-    paths:
-      - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-2-jepa-model.yml"
+
   workflow_dispatch:
 
 jobs:

@@ -7,10 +7,7 @@ on:
     paths:
       - "experiments/G8.4/**"
       - ".github/workflows/g8-4-8-7-6-calibration-direction-diagnostics.yml"
-  pull_request:
-    paths:
-      - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-8-7-6-calibration-direction-diagnostics.yml"
+
   workflow_dispatch:
 
 jobs:
