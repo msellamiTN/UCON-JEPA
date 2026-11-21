@@ -17,3 +17,11 @@ python -m unittest -v
 All normalization is fit on training rows only. Test metrics use a fixed 0.5 intervention threshold. AUROC, AUPRC, Brier score, ECE, confusion metrics and security-feature MSE are reported per seed and aggregated. Seed standard deviations are descriptive repeatability summaries, not population confidence intervals.
 
 The benchmark is synthetic. Its policy oracle and online gate are separately coded but share a written policy interpretation. Results do not establish production security, causal effect, adaptive-agent behavior, or JEPA superiority. Compositional generalization, multi-step prediction, uncertainty/selective-risk guarantees, and intervention utility remain open.
+
+## Policy-shift and intervention research
+
+- **G8.4.7:** [fixed-length policy-conditioned trajectories](G8.4.7_PROTOCOL.md) and [dataset results](G8.4.7_RESULTS.md). Episodes continue after DENY with explicit attempt feedback; this is synthetic behaviour, not a real-agent population model.
+- **G8.4.8.7.7:** [temporal-support alignment protocol](../../docs/research/G8.4.8.7.7_TEMPORAL_SUPPORT_ALIGNMENT_PROTOCOL.md) and [five-seed results dossier](G8.4.8.7.7_TEMPORAL_SUPPORT_ALIGNMENT_RESULTS.md). Latest validated PR head: `b06277ae145c782ec3f5751c6ea9bd66c76a7a13`; its 21 required regression workflows passed.
+- **G8.4.8.8:** [randomized predictive-intervention utility preregistration](../../docs/research/G8.4.8.8_RANDOMIZED_INTERVENTION_UTILITY_PROTOCOL.md). PR #47 is draft. Implementation, power analysis, randomized execution, and scientific review have not yet been completed.
+
+The intervention-utility stage must evaluate episode-level causal outcomes, include a random-warning control and a q=0 negative control, and preserve formal UCON as the sole authorization authority. Offline forecast metrics alone are not evidence of intervention utility.
