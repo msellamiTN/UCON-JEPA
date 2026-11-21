@@ -291,10 +291,14 @@ def run_episode(
         # These shadow labels are recorded only after action selection and never
         # influence the capability-aware replan or the UCON/overlay decision.
         base_candidate_allowed, base_candidate_reason = _policy_oracle(state, base_candidate)
-        if not base_candidate_allowed:
+        if base_candidate_allowed:
+            base_candidate_reason = None
+        else:
             base_candidate_denied_shadow_count += 1
 
         oracle_allowed, oracle_reason = _policy_oracle(state, submitted_action)
+        if oracle_allowed:
+            oracle_reason = None
         oracle_call_count += 1
         ucon_verdict = UCONVerdict.PERMIT if oracle_allowed else UCONVerdict.DENY
         decision = overlay.evaluate_proposal(
