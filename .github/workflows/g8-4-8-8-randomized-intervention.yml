@@ -21,6 +21,8 @@ jobs:
   randomized-intervention:
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    env:
+      UCON_JEPA_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,6 +49,7 @@ jobs:
             --power-simulation-replicates 5000 \
             --bootstrap-replicates 5000 --out randomized-intervention-output
       - name: Retain randomized intervention evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: g8-4-8-8-randomized-intervention
