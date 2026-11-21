@@ -128,6 +128,20 @@ class CapabilityOverlayTests(unittest.TestCase):
         self.assertFalse(decision.may_execute)
         overlay.end_decision()
 
+    def test_invalid_proposal_fails_closed_without_calling_ucon(self):
+        overlay = CapabilityOverlay(manifest())
+        overlay.begin_decision()
+        calls = []
+        decision = overlay.evaluate_proposal("", lambda proposal: calls.append(proposal) or UCONVerdict.PERMIT)
+        self.assertEqual(decision.outcome, ProposalOutcome.UCON_FAILURE_DENY)
+        self.assertEqual(calls, [])
+        self.assertFalse(decision.may_execute)
+        overlay.end_decision()
+
+    def test_rejects_non_manifest_controller_input(self):
+        with self.assertRaisesRegex(TypeError, "CapabilityManifest"):
+            CapabilityOverlay({"read", "export"})
+
     def test_current_ucon_policy_is_rechecked_after_policy_change(self):
         overlay = CapabilityOverlay(manifest())
         state = {"permitted": True}
