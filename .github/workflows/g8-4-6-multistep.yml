@@ -2,15 +2,11 @@ name: G8.4.6 Multi-step JEPA
 on:
   push:
     branches:
-      - main
       - research/g8.4.6-multistep-jepa
     paths:
       - "experiments/G8.4/**"
       - ".github/workflows/g8-4-6-multistep.yml"
-  pull_request:
-    paths:
-      - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-6-multistep.yml"
+
   workflow_dispatch:
 
 jobs:
