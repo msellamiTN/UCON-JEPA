@@ -2,15 +2,11 @@ name: G8.4.5 Compositional Generalization
 on:
   push:
     branches:
-      - main
       - research/g8.4.5-compositional-generalization
     paths:
       - "experiments/G8.4/**"
       - ".github/workflows/g8-4-5-compositional.yml"
-  pull_request:
-    paths:
-      - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-5-compositional.yml"
+
   workflow_dispatch:
 
 jobs:

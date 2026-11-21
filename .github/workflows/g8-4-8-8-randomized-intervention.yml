@@ -1,30 +1,35 @@
-name: G8.4.8.8 Randomized Intervention Simulator
-
-concurrency:
-  group: g8-4-8-8-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
+name: G8.4 Regression and G8.4.8.8 Randomized Intervention
 
 on:
   push:
     branches:
+      - main
       - research/g8.4.8.8-randomized-intervention-utility
     paths:
       - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-8-8-randomized-intervention.yml"
+      - "docs/research/G8.4*"
+      - ".github/workflows/**"
   pull_request:
     paths:
       - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-8-8-randomized-intervention.yml"
+      - "docs/research/G8.4*"
+      - ".github/workflows/**"
   workflow_dispatch:
 
+concurrency:
+  group: g8-4-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
-  randomized-intervention:
+  g8-4-regression-and-intervention:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
       UCON_JEPA_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -33,12 +38,8 @@ jobs:
       - name: Run complete G8.4 regression suite
         working-directory: experiments/G8.4
         run: python -m unittest discover -v
-      - name: Run focused randomized-intervention tests
-        working-directory: experiments/G8.4
-        run: |
-          python -m unittest -v test_randomized_intervention_simulator.py
-          python -m unittest -v test_policy_shift_randomized_intervention.py
       - name: Execute preregistered five-seed randomized intervention benchmark
+        if: github.head_ref == 'research/g8.4.8.8-randomized-intervention-utility' || github.ref_name == 'research/g8.4.8.8-randomized-intervention-utility'
         working-directory: experiments/G8.4
         run: |
           python policy_shift_randomized_intervention.py \
@@ -49,7 +50,7 @@ jobs:
             --power-simulation-replicates 5000 \
             --bootstrap-replicates 5000 --out randomized-intervention-output
       - name: Retain randomized intervention evidence
-        if: always()
+        if: always() && (github.head_ref == 'research/g8.4.8.8-randomized-intervention-utility' || github.ref_name == 'research/g8.4.8.8-randomized-intervention-utility')
         uses: actions/upload-artifact@v4
         with:
           name: g8-4-8-8-randomized-intervention
