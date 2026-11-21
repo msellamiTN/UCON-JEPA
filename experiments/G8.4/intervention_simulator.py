@@ -138,9 +138,9 @@ def make_blocked_episode_specs(
             for family in FAMILIES:
                 for difficulty in TASK_DIFFICULTY_LEVELS[family]:
                     block_specs = []
-                    for index in range(4 * episodes_per_arm_per_stratum):
+                    for index in range(len(arms) * episodes_per_arm_per_stratum):
                         episode_id = (
-                            f"g8-4-8-8-{seed}-{archetype}-{family}-"
+                            f"g8-4-8-8-{seed}-rho{float(rho):.3f}-{archetype}-{family}-"
                             f"{difficulty}-{index:05d}"
                         )
                         context_rng = random.Random(
@@ -161,13 +161,13 @@ def make_blocked_episode_specs(
                             "task_manifest_sha256": TASK_MANIFEST_HASHES[family],
                             "initial_context": context,
                             "stratum": (
-                                f"seed={seed}|archetype={archetype}|family={family}|"
-                                f"difficulty={difficulty}"
+                                f"seed={seed}|rho={float(rho):.3f}|archetype={archetype}|"
+                                f"family={family}|difficulty={difficulty}"
                             ),
                         })
                     assigned_arms = list(arms) * episodes_per_arm_per_stratum
                     assignment_rng = random.Random(_keyed_seed(
-                        assignment_seed, seed, archetype, family, difficulty, "arm-assignment"
+                        assignment_seed, seed, float(rho), archetype, family, difficulty, "arm-assignment"
                     ))
                     assignment_rng.shuffle(assigned_arms)
                     for spec, arm in zip(block_specs, assigned_arms):
