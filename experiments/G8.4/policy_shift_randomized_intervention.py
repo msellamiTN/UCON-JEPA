@@ -678,6 +678,16 @@ def main() -> None:
     episode_sha = _write_jsonl_gzip(episode_artifact, all_results)
     assignment_sha = _write_jsonl_gzip(assignment_artifact, assignments)
     pilot_sha = _write_jsonl_gzip(pilot_artifact, pilot_rows)
+    model_capacity = {
+        str(seed): per_seed[seed]["models"] for seed in seeds
+    }
+    for seed in seeds:
+        model_capacity[str(seed)]["supervised_to_jepa_parameter_ratio"] = (
+            model_capacity[str(seed)]["supervised"]["parameter_count"]
+            / model_capacity[str(seed)]["jepa"]["parameter_count"]
+        )
+        model_capacity[str(seed)]["strict_capacity_match"] = False
+
     result = {
         "benchmark": "G8.4.8.8 randomized predictive-intervention utility",
         "protocol_version": "g8.4.8.8-v1",
@@ -697,9 +707,7 @@ def main() -> None:
         "calibration": {
             str(seed): per_seed[seed]["calibration"] for seed in seeds
         },
-        "model_capacity": {
-            str(seed): per_seed[seed]["models"] for seed in seeds
-        },
+        "model_capacity": model_capacity,
         "model_checkpoints": {
             str(seed): {
                 "file": f"model_checkpoint_seed_{seed}.npz",
