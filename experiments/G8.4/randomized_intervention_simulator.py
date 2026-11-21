@@ -273,11 +273,15 @@ def run_episode(
         "warning_count": int(warnings), "eligible_decisions": int(eligible_count),
         "warning_rate": warnings / eligible_count,
         "revision_count": int(revisions),
+        # The contemporaneous pre-revision verdict is the exact H=1 target.
+        # For H>1 it is not a valid future-window label under intervention.
         "warning_precision": (
-            float(warning_true_positive / warnings) if warnings else None
+            float(warning_true_positive / warnings)
+            if horizon == 1 and warnings else None
         ),
         "warning_recall": (
-            float(warning_true_positive / warning_positive) if warning_positive else None
+            float(warning_true_positive / warning_positive)
+            if horizon == 1 and warning_positive else None
         ),
         "distinct_action_count": int(distinct_actions),
         "repeat_after_deny_count": int(repeat_attempts),
