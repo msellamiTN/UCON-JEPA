@@ -101,6 +101,7 @@ class RandomizedInterventionSimulatorTests(unittest.TestCase):
             thresholds=_thresholds(),
         )
         self.assertEqual(result["warning_count"], 8)
+        self.assertEqual(len(result["warning_lead_times"]), 8)
         self.assertEqual(result["revision_count"], 8)
         self.assertEqual(len(result["records"]), 8)
         for row in result["records"]:
