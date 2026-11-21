@@ -10,6 +10,9 @@ import gzip
 import hashlib
 import json
 import math
+import os
+import platform
+import sys
 from pathlib import Path
 from statistics import NormalDist
 from typing import Any
@@ -144,6 +147,7 @@ def _fit_models_and_thresholds(
         "_partition_ids": partition_ids,
         "thresholds": calibration_manifest,
         "_threshold_objects": thresholds,
+        "_model_objects": {"models": models, "scalers": scalers},
         "train_episodes": int(len(set(dataset["train"]["episode_id"].tolist()))),
         "validation_episodes": int(len(set(dataset["validation"]["episode_id"].tolist()))),
         "calibration_episodes": int(len(set(dataset["calibration"]["episode_id"].tolist()))),
@@ -457,6 +461,34 @@ def _native(value: Any) -> Any:
     return value
 
 
+def _collect_arrays(prefix: str, value: Any, output: dict[str, np.ndarray]) -> None:
+    if isinstance(value, np.ndarray):
+        output[prefix] = value
+    elif isinstance(value, (tuple, list)):
+        for index, item in enumerate(value):
+            _collect_arrays(f"{prefix}_{index}", item, output)
+    elif hasattr(value, "__dict__") and not isinstance(value, type):
+        for name, item in vars(value).items():
+            if name in ("config", "history"):
+                continue
+            _collect_arrays(f"{prefix}_{name}", item, output)
+
+
+def _save_model_checkpoint(
+    path: Path, models: dict[str, Any], scalers: dict[str, Any],
+) -> str:
+    arrays: dict[str, np.ndarray] = {}
+    for name, (model, action_head, temperature) in models.items():
+        _collect_arrays(f"{name}_dynamics", model, arrays)
+        _collect_arrays(f"{name}_action_head", action_head, arrays)
+        arrays[f"{name}_action_temperature"] = np.asarray([temperature], dtype=np.float64)
+    _collect_arrays("scaler", scalers, arrays)
+    if not arrays:
+        raise RuntimeError("no model/scaler arrays found for checkpoint")
+    np.savez_compressed(path, **arrays)
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def _mean_defined(values: list[Any]) -> float | None:
     finite = [float(value) for value in values if value is not None and math.isfinite(float(value))]
     return float(np.mean(finite)) if finite else None
@@ -520,6 +552,7 @@ def main() -> None:
 
     per_seed: dict[int, dict[str, Any]] = {}
     thresholds_by_seed = {}
+    checkpoint_hashes = {}
     for seed in seeds:
         models, score_functions, calibration = _fit_models_and_thresholds(
             seed, args.episodes_per_cell, args.epochs, args.mc_samples
@@ -527,7 +560,13 @@ def main() -> None:
         # Retain unrounded threshold structures for scoring.
         thresholds_by_seed[seed] = calibration.pop("_threshold_objects")
         partition_ids = calibration.pop("_partition_ids")
+        model_objects = calibration.pop("_model_objects")
+        checkpoint_path = args.out / f"model_checkpoint_seed_{seed}.npz"
+        checkpoint_hashes[str(seed)] = _save_model_checkpoint(
+            checkpoint_path, model_objects["models"], model_objects["scalers"]
+        )
         per_seed[seed] = {
+            "model_objects": model_objects,
             "partition_ids": partition_ids,
             "models": {
                 name: {
@@ -640,6 +679,12 @@ def main() -> None:
         "model_capacity": {
             str(seed): per_seed[seed]["models"] for seed in seeds
         },
+        "model_checkpoints": {
+            str(seed): {
+                "file": f"model_checkpoint_seed_{seed}.npz",
+                "sha256": checkpoint_hashes[str(seed)],
+            } for seed in seeds
+        },
         "retained_episode_artifact": {"file": episode_artifact.name, "sha256": episode_sha},
         "retained_assignment_artifact": {"file": assignment_artifact.name, "sha256": assignment_sha},
         "limitations": [
@@ -659,17 +704,38 @@ def main() -> None:
             episode_artifact.name: episode_sha,
             assignment_artifact.name: assignment_sha,
             pilot_artifact.name: pilot_sha,
+            **{
+                f"model_checkpoint_seed_{seed}.npz": checkpoint_hashes[str(seed)]
+                for seed in seeds
+            },
         },
         "seeds": seeds, "power_gate": _native(power),
         "thresholds_frozen_before_confirmatory_episode_generation": True,
         "episode_count": len(all_results),
+        "configuration": {
+            "epochs": args.epochs, "episodes_per_cell": args.episodes_per_cell,
+            "mc_samples": args.mc_samples,
+            "pilot_episodes_per_stratum": args.pilot_episodes_per_stratum,
+            "power_simulation_replicates": args.power_simulation_replicates,
+            "bootstrap_replicates": args.bootstrap_replicates,
+            "max_episodes_per_arm_per_stratum": args.max_episodes_per_arm_per_stratum,
+        },
+        "runtime": {
+            "python": sys.version, "numpy": np.__version__,
+            "platform": platform.platform(),
+            "github_sha": os.environ.get("GITHUB_SHA"),
+        },
         "episode_unit": "one complete eight-transition synthetic episode",
     }
     (args.out / "MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     (args.out / "SHA256SUMS.txt").write_text(
         f"{digest}  {output.name}\n{episode_sha}  {episode_artifact.name}\n"
         f"{assignment_sha}  {assignment_artifact.name}\n"
-        f"{pilot_sha}  {pilot_artifact.name}\n", encoding="utf-8"
+        f"{pilot_sha}  {pilot_artifact.name}\n"
+        + "".join(
+            f"{checkpoint_hashes[str(seed)]}  model_checkpoint_seed_{seed}.npz\n"
+            for seed in seeds
+        ), encoding="utf-8"
     )
     print(json.dumps({
         "output": str(output), "sha256": digest,
