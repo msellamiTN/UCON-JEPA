@@ -116,6 +116,9 @@ class RandomizedInterventionSimulatorTests(unittest.TestCase):
             )
             self.assertEqual(result["warning_count"], expected)
             self.assertEqual(result["revision_count"], expected)
+            if horizon > 1:
+                self.assertIsNone(result["warning_precision"])
+                self.assertIsNone(result["warning_recall"])
 
     def test_random_warning_arm_is_reproducible(self):
         spec = _spec(arm="random_advisory")
