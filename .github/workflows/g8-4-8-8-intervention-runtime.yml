@@ -1,12 +1,6 @@
 name: G8.4.8.8 Intervention Runtime Contract
 
 on:
-  push:
-    branches:
-      - research/g8.4.8.8-causal-intervention-utility
-    paths:
-      - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-8-8-intervention-runtime.yml"
   pull_request:
     paths:
       - "experiments/G8.4/**"
