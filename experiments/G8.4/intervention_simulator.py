@@ -43,6 +43,7 @@ PREDICTIVE_ARM_MODEL = {
     "jepa_overlay": "jepa",
     "supervised_overlay": "supervised",
 }
+TASK_MANIFEST_HASHES = validate_task_manifests()
 EPISODE_LENGTH = 8
 PRIMARY_RHO = 0.85
 OVERLAY_DURATION_DECISIONS = 2
@@ -126,7 +127,6 @@ def make_blocked_episode_specs(
         raise ValueError("at least one seed is required")
     if not math.isfinite(float(rho)) or not 0.0 <= float(rho) <= 1.0:
         raise ValueError("rho must be finite and in [0, 1]")
-    validate_task_manifests()
     specs: list[dict[str, Any]] = []
     for seed in sorted(set(int(value) for value in seeds)):
         for archetype in POLICY_ARCHETYPES:
@@ -153,6 +153,7 @@ def make_blocked_episode_specs(
                             "family": family,
                             "rho": float(rho),
                             "task_difficulty": difficulty,
+                            "task_manifest_sha256": TASK_MANIFEST_HASHES[family],
                             "initial_context": context,
                             "stratum": (
                                 f"seed={seed}|archetype={archetype}|family={family}|"
@@ -383,6 +384,7 @@ def run_episode(
         "rho": rho,
         "task_difficulty": difficulty,
         "task_id": manifest.task_id,
+        "task_manifest_sha256": TASK_MANIFEST_HASHES[family],
         "arm": arm,
         "assignment_seed": int(spec["assignment_seed"]),
         "stratum": str(spec["stratum"]),
