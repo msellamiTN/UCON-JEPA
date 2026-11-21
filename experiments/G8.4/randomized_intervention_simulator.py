@@ -135,6 +135,7 @@ def make_randomized_assignment(
                 "episode_id": episode_id, "seed": int(seed),
                 "archetype": archetype, "family": family, "rho": float(rho),
                 "q": float(q), "horizon": int(horizon), "arm": arm,
+                "assignment_seed": int(assignment_seed),
                 "stratum": stratum,
             })
     return output
