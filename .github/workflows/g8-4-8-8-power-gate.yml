@@ -29,6 +29,10 @@ on:
         required: true
         default: "20261120,20261121,20261122,20261123,20261124"
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
   max-t-power-gate:
     runs-on: ubuntu-latest
