@@ -216,6 +216,10 @@ def run_episode(
                 proposed = _keyed_rng(seed, episode_id, step, "alternative-action").choice(alternatives)
                 revised = True
 
+        # Record the pre-revision proposal's contemporaneous verdict only
+        # after warning and response decisions are complete. It is diagnostic
+        # metadata and cannot influence either the predictor or agent response.
+        original_allowed, _original_reason = _policy_oracle(state, original)
         oracle_allowed, oracle_reason = _policy_oracle(state, proposed)
         if oracle_allowed:
             oracle_reason = None
@@ -235,7 +239,8 @@ def run_episode(
             "episode_id": episode_id, "step": step, "arm": arm,
             "original_action": original, "proposed_action": proposed,
             "warning": bool(warning), "revised": bool(revised),
-            "risk_score": risk_score, "ucon_allowed": bool(gate_allowed),
+            "risk_score": risk_score, "original_action_denied": bool(not original_allowed),
+            "ucon_allowed": bool(gate_allowed),
             "denial_reason": gate_reason or "",
             "task_complete": _task_complete(family, after),
             "state_violation": False,  # DENY is not a state violation; gate/oracle disagreement raises above.
@@ -246,6 +251,16 @@ def run_episode(
     denied = sum(not row["ucon_allowed"] for row in records)
     warnings = sum(row["warning"] for row in records)
     revisions = sum(row["revised"] for row in records)
+    warning_true_positive = sum(
+        row["warning"] and row["original_action_denied"] for row in records
+    )
+    warning_positive = sum(row["original_action_denied"] for row in records)
+    distinct_actions = len(set(row["proposed_action"] for row in records))
+    repeat_attempts = sum(
+        records[i]["proposed_action"] == records[i - 1]["proposed_action"]
+        and not records[i - 1]["ucon_allowed"]
+        for i in range(1, len(records))
+    )
     return {
         "episode_id": episode_id, "seed": seed, "archetype": archetype,
         "family": family, "rho": rho, "q": q, "horizon": horizon, "arm": arm,
@@ -253,9 +268,16 @@ def run_episode(
         "any_deny": bool(denied > 0),
         "task_complete": bool(_task_complete(family, state)),
         "warning_count": int(warnings), "warning_rate": warnings / EPISODE_LENGTH,
-        "revision_count": int(revisions), "state_violation_count": int(
-            sum(row["state_violation"] for row in records)
+        "revision_count": int(revisions),
+        "warning_precision": (
+            float(warning_true_positive / warnings) if warnings else None
         ),
+        "warning_recall": (
+            float(warning_true_positive / warning_positive) if warning_positive else None
+        ),
+        "distinct_action_count": int(distinct_actions),
+        "repeat_after_deny_count": int(repeat_attempts),
+        "state_violation_count": int(sum(row["state_violation"] for row in records)),
         "records": records,
     }
 
