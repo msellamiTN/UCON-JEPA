@@ -1,0 +1,55 @@
+name: G8.4.8.8 Held-Out Predictive Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Independent model-evaluation seeds (comma-separated)
+        required: true
+        default: "20261120,20261121,20261122,20261123,20261124"
+      episodes_per_cell:
+        description: Episodes per policy-parameter cell
+        required: true
+        default: "300"
+      epochs:
+        description: Model training epochs
+        required: true
+        default: "180"
+      mc_samples:
+        description: Monte Carlo samples per E2 prediction
+        required: true
+        default: "32"
+
+jobs:
+  held-out-predictive-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      UCON_JEPA_HEAD_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install experiment dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run complete G8.4 regression suite
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Run held-out JEPA, supervised and DTMC prediction benchmark
+        working-directory: experiments/G8.4
+        run: |
+          python intervention_predictive_benchmark.py \
+            --seeds '${{ inputs.seeds }}' \
+            --episodes-per-cell '${{ inputs.episodes_per_cell }}' \
+            --epochs '${{ inputs.epochs }}' \
+            --mc-samples '${{ inputs.mc_samples }}' \
+            --out predictive-benchmark-output
+      - name: Retain prediction-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-8-predictive-benchmark
+          path: experiments/G8.4/predictive-benchmark-output/
