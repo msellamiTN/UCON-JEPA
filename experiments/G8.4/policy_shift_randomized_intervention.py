@@ -6,6 +6,7 @@ intervention episodes. Pilot power uses nominal-rho synthetic episodes only.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import math
@@ -353,6 +354,46 @@ def _native(value: Any) -> Any:
     return value
 
 
+def _cohort_descriptives(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    groups: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+    for row in rows:
+        key = (
+            row["arm"], float(row["rho"]), float(row["q"]), int(row["horizon"]),
+            int(row["seed"]), row["archetype"], row["family"],
+        )
+        groups.setdefault(key, []).append(row)
+    output = {}
+    for key, values in sorted(groups.items()):
+        output["|".join(map(str, key))] = {
+            "episodes": len(values),
+            "mean_denied_rate": float(np.mean([x["denied_rate"] for x in values])),
+            "any_deny_rate": float(np.mean([x["any_deny"] for x in values])),
+            "task_completion_rate": float(np.mean([x["task_complete"] for x in values])),
+            "mean_warning_rate": float(np.mean([x["warning_rate"] for x in values])),
+            "mean_warning_precision": float(np.nanmean([
+                np.nan if x["warning_precision"] is None else x["warning_precision"] for x in values
+            ])),
+            "mean_warning_recall": float(np.nanmean([
+                np.nan if x["warning_recall"] is None else x["warning_recall"] for x in values
+            ])),
+            "mean_revision_count": float(np.mean([x["revision_count"] for x in values])),
+            "mean_distinct_action_count": float(np.mean([x["distinct_action_count"] for x in values])),
+            "mean_repeat_after_deny_count": float(np.mean([x["repeat_after_deny_count"] for x in values])),
+            "state_violation_count": int(sum(x["state_violation_count"] for x in values)),
+        }
+    return output
+
+
+def _write_jsonl_gzip(path: Path, rows: list[dict[str, Any]]) -> str:
+    payload = "".join(
+        json.dumps(_native(row), sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n"
+        for row in rows
+    ).encode("utf-8")
+    compressed = gzip.compress(payload, compresslevel=9, mtime=0)
+    path.write_bytes(compressed)
+    return hashlib.sha256(compressed).hexdigest()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", default=",".join(map(str, SEEDS)))
@@ -453,6 +494,10 @@ def main() -> None:
             "warning_rate": float(np.mean([r["warning_rate"] for r in selected])),
             "state_violation_count": int(sum(r["state_violation_count"] for r in selected)),
         }
+    episode_artifact = args.out / "episode_results.jsonl.gz"
+    assignment_artifact = args.out / "randomization_manifest.jsonl.gz"
+    episode_sha = _write_jsonl_gzip(episode_artifact, all_results)
+    assignment_sha = _write_jsonl_gzip(assignment_artifact, assignments)
     result = {
         "benchmark": "G8.4.8.8 randomized predictive-intervention utility",
         "protocol_version": "g8.4.8.8-v1",
@@ -460,6 +505,7 @@ def main() -> None:
         "power_gate": power,
         "primary_analysis": primary_analysis,
         "all_arm_descriptives": arm_summaries,
+        "stratified_cohort_descriptives": _cohort_descriptives(all_results),
         "q0_exact_negative_control_replays": q0_checks,
         "calibration": {
             str(seed): per_seed[seed]["calibration"] for seed in seeds
@@ -467,8 +513,8 @@ def main() -> None:
         "model_capacity": {
             str(seed): per_seed[seed]["models"] for seed in seeds
         },
-        "assignment_manifest": assignments,
-        "episode_results": all_results,
+        "retained_episode_artifact": {"file": episode_artifact.name, "sha256": episode_sha},
+        "retained_assignment_artifact": {"file": assignment_artifact.name, "sha256": assignment_sha},
         "limitations": [
             "synthetic action-substitution response model; not an LLM-agent behavior model",
             "five hand-designed policy archetypes and three resource families",
@@ -481,13 +527,21 @@ def main() -> None:
     output.write_text(json.dumps(_native(result), indent=2, allow_nan=False) + "\n", encoding="utf-8")
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
     manifest = {
-        "result_file": output.name, "sha256": digest,
+        "files": {
+            output.name: digest,
+            episode_artifact.name: episode_sha,
+            assignment_artifact.name: assignment_sha,
+        },
         "seeds": seeds, "power_gate": _native(power),
         "thresholds_frozen_before_confirmatory_episode_generation": True,
         "episode_count": len(all_results),
+        "episode_unit": "one complete eight-transition synthetic episode",
     }
     (args.out / "MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    (args.out / "SHA256SUMS.txt").write_text(f"{digest}  {output.name}\n", encoding="utf-8")
+    (args.out / "SHA256SUMS.txt").write_text(
+        f"{digest}  {output.name}\n{episode_sha}  {episode_artifact.name}\n"
+        f"{assignment_sha}  {assignment_artifact.name}\n", encoding="utf-8"
+    )
     print(json.dumps({
         "output": str(output), "sha256": digest,
         "power_gate_passed": power["confirmatory_power_gate_passed"],
