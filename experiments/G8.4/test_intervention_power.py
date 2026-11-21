@@ -78,6 +78,7 @@ class InterventionPowerGateTests(unittest.TestCase):
                 target_power=0.90,
                 critical_replicates=100,
                 power_replicates=100,
+                variance_bootstrap_replicates=100,
                 seed=19,
             )
             self.assertIn(report["status"], {"POWERED", "UNDERPOWERED_AT_MAXIMUM"})
@@ -103,6 +104,7 @@ class InterventionPowerGateTests(unittest.TestCase):
                     max_episodes_per_arm_per_stratum=2,
                     critical_replicates=50,
                     power_replicates=50,
+                    variance_bootstrap_replicates=100,
                 )
 
 
