@@ -53,7 +53,7 @@ jobs:
         working-directory: experiments/G8.4
         run: |
           python intervention_power.py \
-            --pilot '../../../pilot-artifact/episodes/pilot_episodes.jsonl.gz' \
+            --pilot '../../pilot-artifact/episodes/pilot_episodes.jsonl.gz' \
             --confirmatory-seeds '${{ inputs.confirmatory_seeds }}' \
             --delta-u '${{ inputs.delta_u }}' \
             --delta-js '${{ inputs.delta_js }}' \
