@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -206,14 +207,26 @@ def plan_sample_size(
         "target_js_effect": float(target_js_effect),
         "target_l_effect": float(target_l_effect),
     }
-    if any(value <= 0 for value in margins.values()):
-        raise ValueError("all non-inferiority/superiority margins must be positive")
+    if not 0.0 < margins["delta_U"] < 8.0:
+        raise ValueError("delta_U must be in (0, 8) denied proposals per episode")
+    if not 0.0 < margins["delta_JS"] < 8.0:
+        raise ValueError("delta_JS must be in (0, 8) denied proposals per episode")
+    if not 0.0 < margins["delta_L"] < 1.0:
+        raise ValueError("delta_L must be in (0, 1) task-completion probability");
+    if not 0.0 < target_effects["target_u_effect"] <= 8.0:
+        raise ValueError("target_u_effect must be in (0, 8]")
+    if not -8.0 <= target_effects["target_js_effect"] <= 8.0:
+        raise ValueError("target_js_effect must be in [-8, 8]")
+    if not -1.0 <= target_effects["target_l_effect"] <= 1.0:
+        raise ValueError("target_l_effect must be in [-1, 1]")
     if target_effects["target_u_effect"] <= margins["delta_U"]:
         raise ValueError("target_u_effect must exceed delta_U to power superiority beyond its boundary")
     if target_effects["target_js_effect"] >= margins["delta_JS"]:
         raise ValueError("target_js_effect must be below delta_JS for security non-inferiority")
     if target_effects["target_l_effect"] <= -margins["delta_L"]:
         raise ValueError("target_l_effect must exceed -delta_L for task-completion non-inferiority")
+    if len(confirmatory_seeds) != 5 or len(set(confirmatory_seeds)) != 5:
+        raise ValueError("the confirmatory seed set must contain exactly five unique seeds")
     if not 0.0 < target_power < 1.0 or not 0.0 < alpha < 0.5:
         raise ValueError("invalid power or alpha")
     if max_episodes_per_arm_per_stratum < 2:
@@ -235,11 +248,32 @@ def plan_sample_size(
         summary = json.loads(pilot_summary_path.read_text(encoding="utf-8"))
         if summary.get("task_manifest_sha256") != current_manifest_hashes:
             raise ValueError("pilot task-manifest hashes do not match current frozen manifests")
+        expected_episode_sha = summary.get("episode_records_sha256")
+        actual_episode_sha = hashlib.sha256(pilot_path.read_bytes()).hexdigest()
+        if expected_episode_sha != actual_episode_sha:
+            raise ValueError("pilot episode file checksum does not match pilot summary")
+        if sorted(int(value) for value in summary.get("seeds", [])) != pilot_seeds:
+            raise ValueError("pilot seed metadata does not match retained episode records")
 
-    covariance_outcomes, residual_df, cell_count = _pooled_blinded_covariance(rows)
+    block_arms: dict[str, set[str]] = defaultdict(set)
+    block_sizes: dict[tuple[str, str], int] = defaultdict(int)
+    for row in rows:
+        if row["arm"] in ARMS:
+            stratum = str(row["stratum"])
+            arm = str(row["arm"])
+            block_arms[stratum].add(arm)
+            block_sizes[(stratum, arm)] += 1
     expected_pilot_blocks = (
         len(pilot_seeds) * len(pilot_rhos) * ARCHETYPE_COUNT * FAMILY_COUNT * DIFFICULTY_COUNT
     )
+    if len(block_arms) != expected_pilot_blocks:
+        raise ValueError("pilot does not contain the expected number of randomized blocks")
+    if any(arms_in_block != set(ARMS) for arms_in_block in block_arms.values()):
+        raise ValueError("at least one pilot block is missing a confirmatory arm")
+    if any(count < 2 for count in block_sizes.values()):
+        raise ValueError("each pilot block/arm cell needs at least two episodes")
+
+    covariance_outcomes, residual_df, cell_count = _pooled_blinded_covariance(rows)
     expected_cells = expected_pilot_blocks * len(ARMS)
     if cell_count != expected_cells:
         raise ValueError(
