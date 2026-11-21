@@ -46,6 +46,12 @@ jobs:
           python-version: "3.12"
       - name: Install experiment dependencies
         run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Verify pilot workflow completed successfully
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run view '${{ inputs.pilot_run_id }}' --json name,conclusion > pilot-run-status.json
+          jq -e '.name == "G8.4.8.8 Arm-Blinded Intervention Pilot" and .conclusion == "success"' pilot-run-status.json
       - name: Download immutable pilot artifact
         uses: actions/download-artifact@v4
         with:
