@@ -212,7 +212,7 @@ def plan_sample_size(
     if not 0.0 < margins["delta_JS"] < 8.0:
         raise ValueError("delta_JS must be in (0, 8) denied proposals per episode")
     if not 0.0 < margins["delta_L"] < 1.0:
-        raise ValueError("delta_L must be in (0, 1) task-completion probability");
+        raise ValueError("delta_L must be in (0, 1) task-completion probability")
     if not 0.0 < target_effects["target_u_effect"] <= 8.0:
         raise ValueError("target_u_effect must be in (0, 8]")
     if not -8.0 <= target_effects["target_js_effect"] <= 8.0:
