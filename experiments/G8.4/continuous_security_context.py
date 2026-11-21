@@ -130,6 +130,7 @@ def paired_action_branches(
     """Evaluate alternative actions under one shared exogenous disturbance."""
     if family not in FAMILIES:
         raise ValueError(f"unknown family: {family}")
+    x = _vector("state", state)
     selected = ACTIONS[family] if actions is None else tuple(actions)
     if not selected or len(set(selected)) != len(selected):
         raise ValueError("actions must be a non-empty unique tuple")
@@ -139,7 +140,7 @@ def paired_action_branches(
     branches = {}
     for action in selected:
         next_state = transition(
-            state, action, eps, step_size=step_size,
+            x, action, eps, step_size=step_size,
             interaction=interaction,
             second_order_interaction=second_order_interaction,
         )
