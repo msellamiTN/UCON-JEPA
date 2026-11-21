@@ -163,7 +163,7 @@ def _joint_power(
         replicates=critical_replicates, rng=critical_rng,
     )
     power_rng = np.random.default_rng(seed + 202)
-    values, vectors = np.linalg.eigh(correlation)
+    values, vectors = np.linalg.eigh(oriented_correlation)
     root = vectors @ np.diag(np.sqrt(np.maximum(values, 0.0)))
     z = power_rng.standard_normal((power_replicates, 6)) @ root.T
     df = max(2, block_count * 4 * (n_per_arm_per_stratum - 1))
