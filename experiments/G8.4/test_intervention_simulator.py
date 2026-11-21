@@ -4,6 +4,7 @@ from collections import Counter
 
 from intervention_simulator import (
     ARMS,
+    PILOT_ONLY_ARMS,
     fit_episode_max_threshold,
     make_blocked_episode_specs,
     run_episode,
@@ -73,6 +74,14 @@ class RandomizedAssignmentTests(unittest.TestCase):
             self.assertEqual(dict(counts), {arm: 2 for arm in ARMS})
         self.assertEqual(len({spec["episode_id"] for spec in specs}), len(specs))
 
+    def test_random_overlay_arm_is_separate_from_confirmatory_allocation(self):
+        specs = make_blocked_episode_specs(
+            [11], episodes_per_arm_per_stratum=1, assignment_seed=2026,
+            arms=ARMS + PILOT_ONLY_ARMS,
+        )
+        self.assertEqual(set(spec["arm"] for spec in specs), set(ARMS + PILOT_ONLY_ARMS))
+        self.assertEqual(len(specs), 30 * 5)
+
     def test_assignment_reproducibility(self):
         first = make_blocked_episode_specs(
             [11], episodes_per_arm_per_stratum=1, assignment_seed=2026
@@ -116,6 +125,37 @@ class OverlayEpisodeTests(unittest.TestCase):
         self.assertGreaterEqual(len(calls), 1)
         self.assertNotIn("assume_admin", result["records"][0]["available_capabilities"])
         self.assertNotEqual(result["records"][0]["submitted_action"], "assume_admin")
+
+    def test_above_range_threshold_is_a_no_trigger_negative_control(self):
+        baseline = run_episode(_spec(arm="ucon_only"))
+
+        def constant_risk(_context, _horizon, _seed):
+            return 0.9
+
+        no_trigger = run_episode(
+            _spec(arm="jepa_overlay"),
+            score_functions={"jepa": constant_risk},
+            thresholds={"jepa": {"threshold": 10.0, "tie_fraction": 1.0}},
+        )
+        self.assertFalse(no_trigger["overlay_triggered"])
+        self.assertEqual(
+            [row["submitted_action"] for row in baseline["records"]],
+            [row["submitted_action"] for row in no_trigger["records"]],
+        )
+        self.assertEqual(baseline["denied_count"], no_trigger["denied_count"])
+
+    def test_random_overlay_pilot_trigger_is_score_and_label_independent(self):
+        selected = run_episode(
+            _spec(arm="random_overlay_pilot"),
+            random_trigger_fraction=1.0,
+        )
+        not_selected = run_episode(
+            _spec(arm="random_overlay_pilot"),
+            random_trigger_fraction=0.0,
+        )
+        self.assertEqual(selected["overlay_trigger_step"], 0)
+        self.assertEqual(selected["overlay_trigger_reason"], "random_negative_control_pilot")
+        self.assertFalse(not_selected["overlay_triggered"])
 
     def test_predictor_failure_falls_back_to_ucon_only_episode_behavior(self):
         baseline = run_episode(_spec(arm="ucon_only"))
