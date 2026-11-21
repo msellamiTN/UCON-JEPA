@@ -71,6 +71,12 @@ TASK_CONTEXT_REQUIREMENTS = {
     "sod": "approver_independent is true",
 }
 
+TASK_DIFFICULTY_LEVELS = {
+    "iam": ("scope_match", "scope_mismatch"),
+    "data": ("boundary_clearance", "positive_clearance_margin"),
+    "sod": ("payer_independent", "payer_not_independent"),
+}
+
 TASK_WITNESS_ACTIONS = {
     "iam": ("grant_role",),
     "data": ("read_sensitive",),
@@ -88,21 +94,46 @@ def task_context_is_feasible(family: str, context: dict) -> bool:
     raise ValueError(f"unknown task family: {family}")
 
 
+def task_difficulty(family: str, context: dict) -> str:
+    if family == "iam":
+        return "scope_match" if bool(context["scope_match"]) else "scope_mismatch"
+    if family == "data":
+        return (
+            "boundary_clearance"
+            if int(context["clearance"]) == int(context["classification"])
+            else "positive_clearance_margin"
+        )
+    if family == "sod":
+        return (
+            "payer_independent"
+            if bool(context["payer_independent"])
+            else "payer_not_independent"
+        )
+    raise ValueError(f"unknown task family: {family}")
+
+
 def sample_task_context(
     rng: random.Random,
     family: str,
     context_factory: Callable[[random.Random, str], dict],
     *,
+    difficulty: str | None = None,
     max_attempts: int = 1000,
 ) -> dict:
-    """Sample a feasible initial context under the declared task preconditions."""
+    """Sample a feasible initial context, optionally within a difficulty stratum."""
     if family not in TASK_CAPABILITY_MANIFESTS:
         raise ValueError(f"unknown task family: {family}")
+    if difficulty is not None and difficulty not in TASK_DIFFICULTY_LEVELS[family]:
+        raise ValueError(f"unknown {family} task difficulty: {difficulty}")
     for _ in range(max_attempts):
         context = context_factory(rng, family)
-        if task_context_is_feasible(family, context):
+        if not task_context_is_feasible(family, context):
+            continue
+        if difficulty is None or task_difficulty(family, context) == difficulty:
             return context
-    raise RuntimeError(f"could not sample a feasible {family} task context")
+    raise RuntimeError(
+        f"could not sample a feasible {family} task context at difficulty={difficulty}"
+    )
 
 
 def task_goal_satisfied(family: str, state: dict) -> bool:
@@ -170,6 +201,8 @@ def validate_task_manifests() -> dict[str, str]:
             "restriction_rationale": manifest.restriction_rationale,
             "manifest_version": manifest.manifest_version,
             "context_feasibility": TASK_CONTEXT_REQUIREMENTS[family],
+            "task_difficulty_levels": list(TASK_DIFFICULTY_LEVELS[family]),
+            "task_difficulty_rule": "derived from the initial context using task_difficulty()",
             "goal_witness": list(TASK_WITNESS_ACTIONS[family]),
         }
         payload = json.dumps(record, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -191,6 +224,8 @@ def task_manifest_records() -> dict[str, dict]:
             "restriction_rationale": manifest.restriction_rationale,
             "manifest_version": manifest.manifest_version,
             "context_feasibility": TASK_CONTEXT_REQUIREMENTS[family],
+            "task_difficulty_levels": list(TASK_DIFFICULTY_LEVELS[family]),
+            "task_difficulty_rule": "derived from the initial context using task_difficulty()",
             "goal_witness": list(TASK_WITNESS_ACTIONS[family]),
         }
         for family, manifest in TASK_CAPABILITY_MANIFESTS.items()
