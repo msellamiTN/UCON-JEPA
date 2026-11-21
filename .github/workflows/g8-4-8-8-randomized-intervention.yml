@@ -1,4 +1,4 @@
-name: G8.4 Regression and G8.4.8.8 Randomized Intervention
+name: G8.4 Regression — Superseded Intervention Prototype
 
 on:
   push:
@@ -21,11 +21,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  g8-4-regression-and-intervention:
+  g8-4-regression-only:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
-    env:
-      UCON_JEPA_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,20 +36,3 @@ jobs:
       - name: Run complete G8.4 regression suite
         working-directory: experiments/G8.4
         run: python -m unittest discover -v
-      - name: Execute preregistered five-seed randomized intervention benchmark
-        if: github.head_ref == 'research/g8.4.8.8-randomized-intervention-utility' || github.ref_name == 'research/g8.4.8.8-randomized-intervention-utility'
-        working-directory: experiments/G8.4
-        run: |
-          python policy_shift_randomized_intervention.py \
-            --seeds 20261120,20261121,20261122,20261123,20261124 \
-            --episodes-per-cell 300 --epochs 180 --mc-samples 32 \
-            --pilot-episodes-per-stratum 40 \
-            --max-episodes-per-arm-per-stratum 300 \
-            --power-simulation-replicates 5000 \
-            --bootstrap-replicates 5000 --out randomized-intervention-output
-      - name: Retain randomized intervention evidence
-        if: always() && (github.head_ref == 'research/g8.4.8.8-randomized-intervention-utility' || github.ref_name == 'research/g8.4.8.8-randomized-intervention-utility')
-        uses: actions/upload-artifact@v4
-        with:
-          name: g8-4-8-8-randomized-intervention
-          path: experiments/G8.4/randomized-intervention-output/
