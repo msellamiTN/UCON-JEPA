@@ -44,7 +44,7 @@ class RandomizedInterventionAnalysisTests(unittest.TestCase):
                                     "family": family, "rho": rho, "arm": arm,
                                     "denied_rate": ((i + arm_index) % 4) / 8.0,
                                 })
-        result = _power_gate(pilot, max_per_arm=40)
+        result = _power_gate(pilot, max_per_arm=40, replicates=200, seed=12)
         self.assertEqual(result["pilot_source"],
                          "independent nominal-rho pilot episodes; no shifted/reverse test outcomes")
         self.assertEqual(result["standardized_strata"], 75)
