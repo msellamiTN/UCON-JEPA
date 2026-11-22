@@ -210,6 +210,10 @@ def validate_task_manifests() -> dict[str, str]:
     return digests
 
 
+# Stable, validated digests consumed by episode records and analysis gates.
+TASK_MANIFEST_HASHES = validate_task_manifests()
+
+
 def task_manifest_records() -> dict[str, dict]:
     validate_task_manifests()
     return {
