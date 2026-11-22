@@ -5,7 +5,7 @@
 **Canonical baseline:** `main` @ `97b3e97da8f5d231d8a21f9d2e2e3d3962b8dd17`  
 **Inventory branch:** `research/consolidated-baseline-2026-11-22`  
 **Inventory PR:** [#50](https://github.com/msellamiTN/UCON-JEPA/pull/50)  
-**Current inventory head after V1 files:** `b5bcf3e70902bd8daba0a354d16d854e63022917`  
+**PR #50 registry capture:** the PR row records the branch state observed during the V1 registry capture; subsequent documentation commits advance the same PR branch, so use the live PR page for its current head.  
 **Scope:** documentation and evidence curation only. No source implementation, model, experiment, protocol, or runtime behavior is changed by this inventory.
 
 ## 1. Purpose and method
