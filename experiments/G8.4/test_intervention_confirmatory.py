@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,6 +17,8 @@ class ConfirmatoryGateTests(unittest.TestCase):
         report = {
             "status": "POWERED",
             "confirmatory_generation_authorized": True,
+            "source_sha": os.environ.get("UCON_JEPA_HEAD_SHA", os.environ.get("GITHUB_SHA")),
+            "pilot_source_sha": os.environ.get("UCON_JEPA_HEAD_SHA", os.environ.get("GITHUB_SHA")),
             "confirmatory_seeds": list(SEEDS),
             "task_manifest_sha256": validate_task_manifests(),
             "selected_joint_power": 0.93,
