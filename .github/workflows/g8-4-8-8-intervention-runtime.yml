@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - research/g8.4.8.8-causal-intervention-utility
+      - research/g8.4.8.9-counterfactual-policy-world-models
     paths:
       - "experiments/G8.4/**"
       - "docs/research/G8.4*"
