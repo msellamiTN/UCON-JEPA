@@ -159,9 +159,9 @@ def _max_t_critical(
     replicates: int,
     rng: np.random.Generator,
 ) -> float:
-    values, vectors = np.linalg.eigh(oriented_correlation)
+    values, vectors = np.linalg.eigh(correlation)
     root = vectors @ np.diag(np.sqrt(np.maximum(values, 0.0)))
-    z = rng.standard_normal((replicates, 6)) @ root.T
+    z = rng.standard_normal((replicates, correlation.shape[0])) @ root.T
     chi = rng.chisquare(max(1, degrees_of_freedom), size=replicates)
     t_values = z / np.sqrt(chi[:, None] / max(1, degrees_of_freedom))
     return float(np.quantile(np.max(t_values, axis=1), 1.0 - alpha))
