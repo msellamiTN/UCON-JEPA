@@ -1,0 +1,45 @@
+name: G8.4 Regression and Intervention Runtime
+
+on:
+  push:
+    branches:
+      - main
+      - research/g8.4.8.8-causal-intervention-utility
+    paths:
+      - "experiments/G8.4/**"
+      - "docs/research/G8.4*"
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - "docs/research/G8.4*"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+concurrency:
+  group: g8-4-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  g8-4-regression-and-intervention-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      UCON_JEPA_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run complete G8.4 regression suite
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Run focused intervention runtime and simulator tests
+        working-directory: experiments/G8.4
+        run: python -m unittest -v test_intervention_runtime test_intervention_task_manifests test_intervention_dtmc test_intervention_simulator test_intervention_power test_intervention_confirmatory test_intervention_analysis
+
+# Re-run the complete G8.4 regression suite after latest-head statistical-contract fixes.

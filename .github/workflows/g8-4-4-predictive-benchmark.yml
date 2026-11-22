@@ -2,15 +2,11 @@ name: G8.4.4 Predictive Benchmark
 on:
   push:
     branches:
-      - main
       - research/g8.4.4-matched-predictive-benchmark
     paths:
       - "experiments/G8.4/**"
       - ".github/workflows/g8-4-4-predictive-benchmark.yml"
-  pull_request:
-    paths:
-      - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-4-predictive-benchmark.yml"
+
   workflow_dispatch:
 
 jobs:

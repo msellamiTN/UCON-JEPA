@@ -7,10 +7,7 @@ on:
     paths:
       - "experiments/G8.4/**"
       - ".github/workflows/g8-4-8-4-predicted-action-jepa.yml"
-  pull_request:
-    paths:
-      - "experiments/G8.4/**"
-      - ".github/workflows/g8-4-8-4-predicted-action-jepa.yml"
+
   workflow_dispatch:
 
 jobs:
