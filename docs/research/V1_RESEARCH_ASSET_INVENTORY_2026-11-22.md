@@ -220,3 +220,12 @@ Four successful G8.4.8.7.7 GitHub Actions runs were inspected across PRs #45 and
 The artifact-producing source SHAs and the live PR head SHAs are recorded separately. Do not label a workflow as having run at the current PR head unless the exact job log confirms that checked-out SHA. Preserve all four original artifacts until their reported expiry dates in February 2027.
 
 At the initial inventory validation checkpoint, PR #50 was at `709373c3b8af7b6c965867bbb07cd5286f4af8c7` (9 commits, 5 changed files); run `45062585214` passed `g6-runtime-contract`, `latex-build`, and `python-tests`. The subsequent documentation-only audit additions advanced it through `b14cb935bea5aeea90fc92fd93eb35cc86182046` to the live pre-refresh snapshot `eeb7f09731f67e2ade7f344d49eb6df1f3092a3a` (17 commits, 7 changed files). No workflow run was returned for that exact pre-refresh SHA. The commit carrying this inventory refresh is a later documentation-only commit; its exact head and validation state must be read from the live PR, not inferred from this snapshot. These checks validate documentation/repository contracts at their exact revisions; they do not validate all underlying research claims.
+
+
+## 11. Empirical result catalog
+
+The detailed G8.4 experiment-by-experiment synthesis is recorded in [V1_G8.4_RESULT_CATALOG_2026-11-22.md](V1_G8.4_RESULT_CATALOG_2026-11-22.md). It separates dataset/protocol milestones from trained-model results, records the strongest historical and supervised comparators, preserves negative results, and explicitly identifies what is not established. The catalog is a synthesis of existing result dossiers, not an independent reproduction of every experiment.
+
+The catalog's central empirical conclusion is that current synthetic evidence does not establish a stable JEPA-specific advantage over strong supervised or historical baselines. It also distinguishes privileged E1 from decision-time E2, primary one-window-per-episode results from secondary overlapping-window diagnostics, and validated experiments from the still-unvalidated intervention/counterfactual proposals.
+
+At the pre-link-refresh live PR #50 snapshot, the branch head was `922b04e09ef8f379d3098add1a0ff04086491575` (20 commits, 8 changed files); workflow run `45064952105` was in progress. The final branch head and its validation state must be read from the live PR after the documentation updates.
