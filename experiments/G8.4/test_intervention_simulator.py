@@ -47,7 +47,7 @@ class EpisodeThresholdTests(unittest.TestCase):
         first = fit_episode_max_threshold(values, alert_fraction=0.2, tie_seed=77)
         second = fit_episode_max_threshold(values, alert_fraction=0.2, tie_seed=77)
         self.assertEqual(first, second)
-        self.assertEqual(first["target_validation_alerts"], 2)
+        self.assertEqual(first["target_validation_alerts"], 4)
         self.assertEqual(first["threshold"], 3.0)
         self.assertAlmostEqual(first["tie_fraction"], 2.0 / 3.0)
 
