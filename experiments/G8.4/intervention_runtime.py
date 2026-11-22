@@ -192,7 +192,7 @@ class CapabilityOverlay:
     def end_decision(self) -> bool:
         """Close the decision opportunity; return True exactly when overlay expires."""
         if not self._decision_open:
-            raise RuntimeError("no open decision to end")
+            raise RuntimeError("begin_decision() must precede end_decision()")
         self._decision_open = False
         if self._remaining == 0:
             self._current_available = self._manifest.base_capabilities
