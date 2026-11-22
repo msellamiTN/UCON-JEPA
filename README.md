@@ -6,6 +6,10 @@ This repository is the version-controlled research source of truth for UCON-JEPA
 
 **Research process:** follow [RESEARCH_AGENT_WORKFLOW.md](docs/research/RESEARCH_AGENT_WORKFLOW.md) for literature, proof, formal-methods, runtime, experimental, adversarial, and release audits.
 
+**Consolidated research status (22 November 2026):** see [CONSOLIDATED_RESEARCH_BASELINE_2026-11-22.md](docs/research/CONSOLIDATED_RESEARCH_BASELINE_2026-11-22.md) for the historical work inventory, evidence/claim ledger, open-branch status, scientific conclusions, and next validation gates. This status record distinguishes merged baseline work from draft/unmerged research tracks.
+
+**V1 research asset inventory:** [V1_RESEARCH_ASSET_INVENTORY_2026-11-22.md](docs/research/V1_RESEARCH_ASSET_INVENTORY_2026-11-22.md), [PR registry CSV](docs/research/V1_PR_REGISTRY_2026-11-22.csv), and [G8.4 experiment asset index CSV](docs/research/V1_G8.4_ASSET_INDEX_2026-11-22.csv). This is a documentation-only snapshot; artifact-level reconciliation remains open.
+
 ## Research position
 
 UCON-JEPA investigates whether action-conditioned predictive representations can improve anticipation of security violations in compositional autonomous-agent workflows while preserving authoritative formal usage-control enforcement.
