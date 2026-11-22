@@ -213,7 +213,7 @@ Proceed to the remaining documentation-only C1 reconciliation: verify artifact p
 
 ## 10. Artifact-level provenance audit
 
-The detailed run-by-run audit is in [V1_ARTIFACT_PROVENANCE_AUDIT_2026-11-22.md](V1_ARTIFACT_PROVENANCE_AUDIT_2026-11-22.md), with its machine-readable companion [V1_ARTIFACT_REGISTRY_2026-11-22.csv](V1_ARTIFACT_REGISTRY_2026-11-22.csv).
+The detailed run-by-run audit is in [V1_ARTIFACT_PROVENANCE_AUDIT_2026-11-22.md](V1_ARTIFACT_PROVENANCE_AUDIT_2026-11-22.md), with its machine-readable companion [V1_ARTIFACT_REGISTRY_2026-11-22.csv](V1_ARTIFACT_REGISTRY_2026-11-22.csv). The registry now catalogs 16 retained G8.4 artifacts across PRs #32–46. The 12 earlier entries have workflow/API metadata and source-dossier hashes recorded, but their ZIP payloads were not re-extracted in this audit. The four PR #45/#46 artifacts were downloaded, checksum-verified and compared at payload level; the audit report states the exact scope.
 
 Four successful G8.4.8.7.7 GitHub Actions runs were inspected across PRs #45 and #46. All 120 dataset-file checksum entries verified, and all four artifacts share the same aggregate dataset fingerprint. PR #46's extracted result payload is byte-identical across its two runs. PR #45's datasets match, but its result JSON differs numerically across repeated runs; the maximum summary-level absolute difference is approximately `4.285e-7`, while the maximum differing numeric leaf across the full JSON is approximately `9.34e-5`. The cause is unresolved. This is an explicit reproducibility limitation, not evidence that the scientific conclusions are invalid or valid.
 
