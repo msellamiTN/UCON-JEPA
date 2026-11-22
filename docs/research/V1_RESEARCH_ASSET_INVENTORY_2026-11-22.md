@@ -5,6 +5,7 @@
 **Canonical baseline:** `main` @ `97b3e97da8f5d231d8a21f9d2e2e3d3962b8dd17`  
 **Inventory branch:** `research/consolidated-baseline-2026-11-22`  
 **Inventory PR:** [#50](https://github.com/msellamiTN/UCON-JEPA/pull/50)  
+**Current inventory head after V1 files:** `b5bcf3e70902bd8daba0a354d16d854e63022917`  
 **Scope:** documentation and evidence curation only. No source implementation, model, experiment, protocol, or runtime behavior is changed by this inventory.
 
 ## 1. Purpose and method
@@ -174,9 +175,9 @@ These PRs are open drafts and are not part of `main`. The PR registry CSV record
 | #46 / `b06277a...` | [44923766820](https://github.com/msellamiTN/UCON-JEPA/actions/runs/44923766820) | Temporal-support job success | Current-head five-seed benchmark/test/artifact job pass; reconcile dossier source head |
 | #48 / `4368f8c...` | [45059305578](https://github.com/msellamiTN/UCON-JEPA/actions/runs/45059305578) | Full G8.4 regression and focused intervention runtime/simulator tests success | Does not execute pilot or confirmatory intervention |
 | #49 / `5420677...` | No run returned | No current-head PR workflow run observed | Not evidence of pass or fail |
-| #50 / `60b9849...` | [45060931770](https://github.com/msellamiTN/UCON-JEPA/actions/runs/45060931770) | G6 runtime contract and Python tests success; LaTeX build skipped | Documentation PR workflow passed; LaTeX was skipped because source inputs were unchanged, not rebuilt |
+| #50 / pre-inventory head `60b9849...` | [45060931770](https://github.com/msellamiTN/UCON-JEPA/actions/runs/45060931770) | G6 runtime contract and Python tests success; LaTeX build skipped | This run predates the V1 inventory commits; LaTeX was skipped because source inputs were unchanged, not rebuilt |
 
-The PR #50 workflow did **not** perform a new LaTeX build: the `latex-build` job skipped TeX installation and compilation because no LaTeX source inputs changed. Do not describe this as a LaTeX compilation pass.
+The PR #50 workflow did **not** perform a new LaTeX build: the `latex-build` job skipped TeX installation and compilation because no LaTeX source inputs changed. Do not describe this as a LaTeX compilation pass. After the V1 files and README link were committed, the PR head advanced to `b5bcf3e70902bd8daba0a354d16d854e63022917` (six commits, five changed files). No workflow run was returned for this new head at the time of this inventory readback; the earlier run above must not be treated as validation of the updated head.
 
 ## 9. Publication value assessment — preliminary, not a novelty verdict
 
