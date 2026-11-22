@@ -209,3 +209,14 @@ The best near-term publication opportunity may be a carefully scoped empirical/m
 ## 11. Next authorized activity
 
 Proceed to the remaining documentation-only C1 reconciliation: verify artifact provenance for PR #45/#46, inventory all retained G8.4 run artifacts and manifests, and assemble the claim-to-evidence ledger. Do not modify experiment code, models, protocols, runtime behavior or historical results.
+
+
+## 10. Artifact-level provenance audit
+
+The detailed run-by-run audit is in [V1_ARTIFACT_PROVENANCE_AUDIT_2026-11-22.md](V1_ARTIFACT_PROVENANCE_AUDIT_2026-11-22.md), with its machine-readable companion [V1_ARTIFACT_REGISTRY_2026-11-22.csv](V1_ARTIFACT_REGISTRY_2026-11-22.csv).
+
+Four successful G8.4.8.7.7 GitHub Actions runs were inspected across PRs #45 and #46. All 120 dataset-file checksum entries verified, and all four artifacts share the same aggregate dataset fingerprint. PR #46's extracted result payload is byte-identical across its two runs. PR #45's datasets match, but its result JSON differs numerically across repeated runs; the maximum summary-level absolute difference is approximately `4.285e-7`, while the maximum differing numeric leaf across the full JSON is approximately `9.34e-5`. The cause is unresolved. This is an explicit reproducibility limitation, not evidence that the scientific conclusions are invalid or valid.
+
+The artifact-producing source SHAs and the live PR head SHAs are recorded separately. Do not label a workflow as having run at the current PR head unless the exact job log confirms that checked-out SHA. Preserve all four original artifacts until their reported expiry dates in February 2027.
+
+The consolidation branch itself is currently at `709373c3b8af7b6c965867bbb07cd5286f4af8c7` (9 commits, 5 changed files at the live PR query). Its current-head workflow run `45062585214` completed successfully: `g6-runtime-contract`, `latex-build`, and `python-tests`. This validates the consolidation branch at that SHA; it does not validate all underlying research claims.
