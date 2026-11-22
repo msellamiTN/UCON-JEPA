@@ -1,6 +1,7 @@
 import gzip
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -53,6 +54,7 @@ class InterventionPowerGateTests(unittest.TestCase):
         sha = hashlib.sha256(episodes.read_bytes()).hexdigest()
         summary = {
             "seeds": list(pilot_seeds),
+            "source_sha": os.environ.get("UCON_JEPA_HEAD_SHA", os.environ.get("GITHUB_SHA")),
             "task_manifest_sha256": validate_task_manifests(),
             "episode_records_sha256": sha,
         }
