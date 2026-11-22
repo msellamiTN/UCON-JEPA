@@ -43,7 +43,7 @@ def _spec(
 
 class EpisodeThresholdTests(unittest.TestCase):
     def test_episode_max_threshold_is_deterministic_and_records_tie_fraction(self):
-        values = [(f"e{i}", float(score)) for i, score in enumerate([0, 1, 1, 1, 2, 2, 2, 3, 3, 3])]
+        values = [(f"e{i}", float(score)) for i, score in enumerate([0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 4, 4])]
         first = fit_episode_max_threshold(values, alert_fraction=0.2, tie_seed=77)
         second = fit_episode_max_threshold(values, alert_fraction=0.2, tie_seed=77)
         self.assertEqual(first, second)
