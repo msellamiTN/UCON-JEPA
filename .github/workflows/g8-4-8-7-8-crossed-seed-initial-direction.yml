@@ -1,0 +1,50 @@
+name: G8.4.8.7.8 Crossed-Seed Initial Direction Audit
+
+on:
+  push:
+    branches:
+      - research/g8.4.8.7.8-crossed-seed-initial-direction-impl2
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-7-8-crossed-seed-initial-direction.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-7-8-crossed-seed-initial-direction.yml"
+  workflow_dispatch:
+
+jobs:
+  crossed-seed-initial-direction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run complete G8.4 regression suite
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Run focused crossed-seed audit tests
+        working-directory: experiments/G8.4
+        run: python -m unittest -v test_policy_shift_crossed_seed_initial_direction.py
+      - name: Execute fully crossed 5x5 benchmark
+        working-directory: experiments/G8.4
+        env:
+          UCON_JEPA_CODE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          python policy_shift_crossed_seed_initial_direction.py
+          --dataset-seeds 20261120,20261121,20261122,20261123,20261124
+          --model-seeds 20261120,20261121,20261122,20261123,20261124
+          --episodes-per-cell 300
+          --epochs 180
+          --mc-samples 32
+          --bootstrap-replicates 2000
+          --out crossed-seed-initial-direction-output
+      - name: Retain datasets, episode-level predictions and crossed-seed evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-7-8-crossed-seed-initial-direction
+          path: experiments/G8.4/crossed-seed-initial-direction-output/
