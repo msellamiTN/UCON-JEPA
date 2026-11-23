@@ -1,0 +1,103 @@
+{
+  "benchmark": "G8.4.8.7.7 temporal-support alignment",
+  "source_artifact_id": 14715590169,
+  "source_artifact_sha256": "ca5f5bac369479b38bdb4b941c4097ace6d2c9771484737c229bad1a7ef049a5",
+  "source_code_head": "b06277ae145c782ec3f5751c6ea9bd66c76a7a13",
+  "comparison": "H=1, start_step=0, shifted rho=.85; legacy inference RNG; summary metrics only (prior artifact does not retain raw per-window prediction vectors)",
+  "tolerance": {
+    "absolute": 1e-12,
+    "relative": 0
+  },
+  "seeds": {
+    "20261120": {
+      "JEPA_E2": {
+        "calibration_slope": 0.1403905496267962,
+        "test_auroc": 0.5409130512091038,
+        "test_brier": 0.3365636368449578,
+        "test_delta": 0.007910896054475675,
+        "n": 4500,
+        "positive": 2280
+      },
+      "supervised_E2": {
+        "calibration_slope": 0.23724580992615504,
+        "test_auroc": 0.5666356488067015,
+        "test_brier": 0.32889865896757764,
+        "test_delta": 0.02238176947690948,
+        "n": 4500,
+        "positive": 2280
+      }
+    },
+    "20261121": {
+      "JEPA_E2": {
+        "calibration_slope": 0.19668572528380956,
+        "test_auroc": 0.5514123273573512,
+        "test_brier": 0.35801339585258024,
+        "test_delta": 0.009420302905683714,
+        "n": 4500,
+        "positive": 2281
+      },
+      "supervised_E2": {
+        "calibration_slope": 0.25251992015004965,
+        "test_auroc": 0.5504648882484161,
+        "test_brier": 0.35045324872009714,
+        "test_delta": 0.011948390815439108,
+        "n": 4500,
+        "positive": 2281
+      }
+    },
+    "20261122": {
+      "JEPA_E2": {
+        "calibration_slope": -0.17501332466665712,
+        "test_auroc": 0.4511014337734037,
+        "test_brier": 0.3531547756150589,
+        "test_delta": -0.00938195284932225,
+        "n": 4500,
+        "positive": 2281
+      },
+      "supervised_E2": {
+        "calibration_slope": 0.12062964275278942,
+        "test_auroc": 0.528653735553554,
+        "test_brier": 0.34346958180447784,
+        "test_delta": 0.007378423960501229,
+        "n": 4500,
+        "positive": 2281
+      }
+    },
+    "20261123": {
+      "JEPA_E2": {
+        "calibration_slope": 0.08351675298300476,
+        "test_auroc": 0.5426138092299133,
+        "test_brier": 0.3233610042680942,
+        "test_delta": 0.007733506017414793,
+        "n": 4500,
+        "positive": 2278
+      },
+      "supervised_E2": {
+        "calibration_slope": 0.14472490325663886,
+        "test_auroc": 0.5495692567500824,
+        "test_brier": 0.34163731195289204,
+        "test_delta": 0.01159694214113588,
+        "n": 4500,
+        "positive": 2278
+      }
+    },
+    "20261124": {
+      "JEPA_E2": {
+        "calibration_slope": 0.17208945867092748,
+        "test_auroc": 0.5567232286227257,
+        "test_brier": 0.33698501460733216,
+        "test_delta": 0.014373886112154066,
+        "n": 4500,
+        "positive": 2276
+      },
+      "supervised_E2": {
+        "calibration_slope": 0.2126027637417596,
+        "test_auroc": 0.5620541132998698,
+        "test_brier": 0.3340684378523346,
+        "test_delta": 0.017122943545360814,
+        "n": 4500,
+        "positive": 2276
+      }
+    }
+  }
+}
