@@ -102,6 +102,20 @@ def _strata_indices(part: dict[str, np.ndarray]) -> list[np.ndarray]:
     return [np.asarray(groups[key], dtype=np.int64) for key in sorted(groups)]
 
 
+def _strata_episode_counts(part: dict[str, np.ndarray]) -> dict[str, int]:
+    policies = np.asarray(part["agent_policy"])
+    families = np.asarray(part["family"])
+    labels = np.asarray(part["truth"], dtype=np.int64)
+    return {
+        f"{policy}/{family}/label={label}": int(
+            np.sum((policies == policy) & (families == family) & (labels == label))
+        )
+        for policy in sorted(set(policies.tolist()))
+        for family in sorted(set(families.tolist()))
+        for label in (0, 1)
+    }
+
+
 def _sample_stratified_indices(
     groups: list[np.ndarray], rng: np.random.Generator
 ) -> np.ndarray:
@@ -225,6 +239,8 @@ def _bootstrap_cell(
         "unit": "whole episode, resampled within policy × family × label strata",
         "replicates": replicates,
         "interval_interpretation": "conditional on observed class counts in each policy-family stratum",
+        "calibration_stratum_episode_counts": _strata_episode_counts(cal_ref),
+        "shifted_test_stratum_episode_counts": _strata_episode_counts(test_ref),
         "models": {
             model: {
                 "calibration_delta_ci95": _percentile_ci(draws[model]["calibration_delta"]),
