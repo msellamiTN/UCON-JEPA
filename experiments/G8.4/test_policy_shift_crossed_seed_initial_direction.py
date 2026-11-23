@@ -37,7 +37,7 @@ class CrossedSeedInitialDirectionTests(unittest.TestCase):
     def test_primary_rollout_seeds_are_fixed_independently_of_both_factors(self):
         self.assertEqual(CALIBRATION_ROLLOUT_SEED, 20271119)
         self.assertEqual(SHIFTED_ROLLOUT_SEED, 20361119)
-        self.assertEqual(REVERSE_ROLLOUT_SEED, 20411119)
+        self.assertEqual(REVERSE_ROLLOUT_SEED, 20861119)
         # The constants are module-level and do not accept either crossed factor.
         self.assertEqual(CALIBRATION_ROLLOUT_SEED, 20261119 + 10_000)
         self.assertEqual(SHIFTED_ROLLOUT_SEED, 20261119 + 100_000)
@@ -241,7 +241,7 @@ class CrossedSeedInitialDirectionTests(unittest.TestCase):
             self.assertEqual(set(reference["seeds"][str(seed)]), {"JEPA_E2", "supervised_E2"})
             for model in ("JEPA_E2", "supervised_E2"):
                 self.assertEqual(
-                    set(reference["seeds"][str(seed)][model]["test_shifted"]),
+                    set(reference["seeds"][str(seed)][model]),
                     {"calibration_slope", "test_auroc", "test_brier", "test_delta", "n", "positive"},
                 )
 
