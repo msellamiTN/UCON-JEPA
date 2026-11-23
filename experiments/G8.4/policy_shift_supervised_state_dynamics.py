@@ -23,7 +23,7 @@ class LinearSupervisedStateDynamics:
         self.context_dim = context_dim
         self.action_dim = action_dim
         self.security_dim = security_dim
-        rng = np.random.default_rng(config.seed)
+        rng = _factor_rng(config, "initialization")
         scale = 1.0 / np.sqrt(config.latent_dim)
         d = config.latent_dim
         self.W_context = rng.normal(0, scale, (context_dim, d))
@@ -44,7 +44,7 @@ class LinearSupervisedStateDynamics:
         )
         if not (len(xc) == len(xa) == len(yf) == len(ys)) or len(xc) < 2:
             raise ValueError("aligned arrays with at least two rows are required")
-        rng = np.random.default_rng(self.config.seed)
+        rng = _factor_rng(self.config, "minibatch_order")
         c = self.config
         d = c.latent_dim
         for _ in range(c.epochs):
