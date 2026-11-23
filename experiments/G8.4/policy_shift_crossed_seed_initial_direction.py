@@ -54,6 +54,42 @@ def _score_summary(scores: np.ndarray, labels: np.ndarray) -> dict[str, Any]:
     }
 
 
+def _group_metrics_safe(part: dict[str, np.ndarray], calibrated: np.ndarray) -> dict[str, Any]:
+    output: dict[str, Any] = {}
+    policies = sorted(set(part["agent_policy"].tolist()))
+    families = sorted(set(part["family"].tolist()))
+    truth = np.asarray(part["truth"], dtype=np.int64)
+    raw = np.asarray(part["raw"], dtype=np.float64)
+    for policy in policies:
+        output[str(policy)] = {}
+        for family in families:
+            mask = (part["agent_policy"] == policy) & (part["family"] == family)
+            if not np.any(mask):
+                output[str(policy)][str(family)] = {
+                    "available": False, "reason": "no episodes in this fixed cell", "n": 0
+                }
+                continue
+            y = truth[mask]
+            if len(np.unique(y)) != 2:
+                output[str(policy)][str(family)] = {
+                    "available": False,
+                    "reason": "only one class in this fixed cell",
+                    "n": int(len(y)),
+                    "positive": int(y.sum()),
+                    "prevalence": float(y.mean()),
+                }
+                continue
+            output[str(policy)][str(family)] = {
+                "available": True,
+                "n": int(len(y)),
+                "positive": int(y.sum()),
+                "prevalence": float(y.mean()),
+                "raw_metrics": binary_metrics(y, raw[mask]),
+                "calibrated_metrics": binary_metrics(y, calibrated[mask]),
+            }
+    return output
+
+
 def _position_zero(prediction: dict[str, Any]) -> dict[str, np.ndarray]:
     windows = prediction["windows"]
     mask = np.asarray(windows["start_step"]) == 0
@@ -192,21 +228,22 @@ def _bootstrap_cell(
         }
         for model in models
     }
-    paired = {"raw_brier": [], "calibrated_brier": []}
+    paired = {name: [] for name in ("calibration_delta", "calibration_slope", "test_delta", "test_auroc", "raw_brier", "calibrated_brier")}
 
     for _ in range(replicates):
         cal_idx = _sample_stratified_indices(cal_groups, rng_cal)
         test_idx = _sample_stratified_indices(test_groups, rng_test)
         params_by_model: dict[str, dict[str, float]] = {}
+        calibration_values: dict[str, dict[str, float]] = {}
         for model in models:
             cal = calibration[model]
             y_cal = cal["truth"][cal_idx]
             s_cal = cal["raw"][cal_idx]
             params = _fit_platt(s_cal, y_cal)
             params_by_model[model] = params
-            draws[model]["calibration_delta"].append(
-                float(s_cal[y_cal == 1].mean() - s_cal[y_cal == 0].mean())
-            )
+            calibration_delta = float(s_cal[y_cal == 1].mean() - s_cal[y_cal == 0].mean())
+            calibration_values[model] = {"delta": calibration_delta, "slope": float(params["slope"])}
+            draws[model]["calibration_delta"].append(calibration_delta)
             draws[model]["calibration_slope"].append(float(params["slope"]))
 
         test_values: dict[str, dict[str, float]] = {}
@@ -227,6 +264,18 @@ def _bootstrap_cell(
             draws[model]["test_brier"].append(values["brier"])
             draws[model]["test_calibrated_brier"].append(values["calibrated_brier"])
 
+        paired["calibration_delta"].append(
+            calibration_values["JEPA_E2"]["delta"] - calibration_values["supervised_E2"]["delta"]
+        )
+        paired["calibration_slope"].append(
+            calibration_values["JEPA_E2"]["slope"] - calibration_values["supervised_E2"]["slope"]
+        )
+        paired["test_delta"].append(
+            test_values["JEPA_E2"]["delta"] - test_values["supervised_E2"]["delta"]
+        )
+        paired["test_auroc"].append(
+            test_values["JEPA_E2"]["auroc"] - test_values["supervised_E2"]["auroc"]
+        )
         paired["raw_brier"].append(
             test_values["JEPA_E2"]["brier"] - test_values["supervised_E2"]["brier"]
         )
@@ -255,6 +304,10 @@ def _bootstrap_cell(
             for model in models
         },
         "paired_JEPA_minus_supervised": {
+            "calibration_delta_ci95": _percentile_ci(paired["calibration_delta"]),
+            "calibration_slope_ci95": _percentile_ci(paired["calibration_slope"]),
+            "shifted_test_raw_delta_ci95": _percentile_ci(paired["test_delta"]),
+            "shifted_test_raw_auroc_ci95": _percentile_ci(paired["test_auroc"]),
             "shifted_test_raw_brier_ci95": _percentile_ci(paired["raw_brier"]),
             "shifted_test_calibrated_brier_ci95": _percentile_ci(paired["calibrated_brier"]),
         },
@@ -607,6 +660,7 @@ def _run_matrix(
                         "raw_score": _score_summary(test_data["raw"], test_data["truth"]),
                         "raw_metrics": raw_metrics,
                         "calibrated_metrics": calibrated_metrics,
+                        "by_archetype_family": _group_metrics_safe(test_data, calibrated),
                         "calibration": calibrators[model_name],
                     }
 
