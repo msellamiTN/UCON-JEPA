@@ -295,6 +295,10 @@ def _matrix_factor_summary(
     ss_training = float(len(dataset_seeds) * np.square(col_effect).sum())
     ss_residual = float(np.square(residual).sum())
     return {
+        "additive_residuals_by_dataset_seed": {
+            str(seed): [float(v) for v in residual[i]]
+            for i, seed in enumerate(dataset_seeds)
+        },
         "dataset_seed_rows": {
             str(seed): [float(v) for v in matrix[i]]
             for i, seed in enumerate(dataset_seeds)
@@ -317,6 +321,71 @@ def _matrix_factor_summary(
             "residual_including_interaction": ss_residual,
             "interaction_not_separately_identifiable": True,
         },
+    }
+
+
+def _recurrence_summary(
+    cells: dict[str, Any],
+    dataset_seeds: tuple[int, ...],
+    model_seeds: tuple[int, ...],
+) -> dict[str, Any]:
+    def counts_for_row(dataset_seed: int) -> dict[str, int]:
+        selected = [cells[f"{dataset_seed}:{m}"] for m in model_seeds]
+        return _recurrence_counts(selected)
+
+    def counts_for_column(model_seed: int) -> dict[str, int]:
+        selected = [cells[f"{d}:{model_seed}"] for d in dataset_seeds]
+        return _recurrence_counts(selected)
+
+    rows = {str(d): counts_for_row(d) for d in dataset_seeds}
+    columns = {str(m): counts_for_column(m) for m in model_seeds}
+
+    def qualifies(counts: dict[str, int]) -> bool:
+        return (
+            counts["JEPA_supported_negative"] >= 4
+            and counts["supervised_supported_negative"] <= 1
+            and counts["JEPA_minus_supervised_raw_AUROC_negative"] >= 4
+            and counts["JEPA_minus_supervised_calibration_slope_negative"] >= 4
+        )
+
+    return {
+        "dataset_seed_rows": rows,
+        "model_training_seed_columns": columns,
+        "dataset_seed_linked_recurrence": {
+            key: value["JEPA_supported_negative"] >= 4
+            for key, value in rows.items()
+        },
+        "training_seed_linked_recurrence": {
+            key: value["JEPA_supported_negative"] >= 4
+            for key, value in columns.items()
+        },
+        "JEPA_specific_dataset_seed_recurrence": {
+            key: qualifies(value) for key, value in rows.items()
+        },
+        "JEPA_specific_training_seed_recurrence": {
+            key: qualifies(value) for key, value in columns.items()
+        },
+    }
+
+
+def _recurrence_counts(selected_cells: list[dict[str, Any]]) -> dict[str, int]:
+    jepa_negative = supervised_negative = auroc_negative = slope_negative = 0
+    for cell in selected_cells:
+        models = cell["models"]
+        jepa_negative += int(
+            models["shifted"]["JEPA_E2"]["direction_classification"] == "supported_negative"
+        )
+        supervised_negative += int(
+            models["shifted"]["supervised_E2"]["direction_classification"] == "supported_negative"
+        )
+        paired = models["paired_JEPA_minus_supervised"]
+        auroc_negative += int(paired["JEPA_minus_supervised_raw_auroc"] < 0.0)
+        slope_negative += int(paired["JEPA_minus_supervised_calibration_slope"] < 0.0)
+    return {
+        "JEPA_supported_negative": jepa_negative,
+        "supervised_supported_negative": supervised_negative,
+        "JEPA_minus_supervised_raw_AUROC_negative": auroc_negative,
+        "JEPA_minus_supervised_calibration_slope_negative": slope_negative,
     }
 
 
@@ -648,6 +717,8 @@ def _run_matrix(
             )
             for m in model_seeds
         }
+
+    factor_analysis["recurrence_rules"] = _recurrence_summary(cells, dataset_seeds, model_seeds)
 
     result = {
         "benchmark": "G8.4.8.7.8 crossed-seed initial-position direction audit",
