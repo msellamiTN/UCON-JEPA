@@ -220,7 +220,7 @@ class LinearActionConditionedSupervised:
             raise ValueError("all feature dimensions must be positive")
         self.config = config
         self.context_dim, self.action_dim, self.security_dim = context_dim, action_dim, security_dim
-        rng = np.random.default_rng(config.seed)
+        rng = _factor_rng(config, "initialization")
         scale = 1.0 / np.sqrt(config.latent_dim)
         self.W_context = rng.normal(0, scale, (context_dim, config.latent_dim))
         self.W_action = rng.normal(0, scale, (action_dim, config.latent_dim))
@@ -234,7 +234,7 @@ class LinearActionConditionedSupervised:
         ys = LinearActionConditionedJEPA._matrix(security_targets, "security_targets")
         if len(xc) != len(xa) or len(xc) != len(ys) or len(xc) < 2:
             raise ValueError("aligned arrays with at least two rows are required")
-        rng = np.random.default_rng(self.config.seed)
+        rng = _factor_rng(self.config, "minibatch_order")
         for _ in range(self.config.epochs):
             order = rng.permutation(len(xc))
             for start in range(0, len(xc), self.config.batch_size):
