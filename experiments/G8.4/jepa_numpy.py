@@ -34,6 +34,8 @@ class JEPAConfig:
     variance_weight: float = 0.1
     security_weight: float = 0.25
     seed: int = 20261119
+    initialization_seed: int | None = None
+    minibatch_order_seed: int | None = None
 
     def __post_init__(self):
         if self.latent_dim < 2 or self.epochs < 1 or self.batch_size < 1:
@@ -42,6 +44,22 @@ class JEPAConfig:
             raise ValueError("learning_rate must be positive and ema_tau in (0,1)")
         if self.variance_floor <= 0 or self.variance_weight < 0 or self.security_weight < 0:
             raise ValueError("variance floor must be positive; loss weights non-negative")
+        if (self.initialization_seed is None) != (self.minibatch_order_seed is None):
+            raise ValueError("initialization_seed and minibatch_order_seed must be supplied together")
+
+
+def _factor_rng(config: JEPAConfig, factor: str) -> np.random.Generator:
+    """Domain-separated factor RNG; preserve the historical stream by default."""
+    if config.initialization_seed is None and config.minibatch_order_seed is None:
+        return np.random.default_rng(config.seed)
+    if factor == "initialization":
+        seed, tag = config.initialization_seed, 0x1A17
+    elif factor == "minibatch_order":
+        seed, tag = config.minibatch_order_seed, 0xB47C
+    else:
+        raise ValueError(f"unknown RNG factor: {factor}")
+    sequence = np.random.SeedSequence(int(seed), spawn_key=(tag,))
+    return np.random.default_rng(sequence)
 
 
 @dataclass
@@ -64,7 +82,7 @@ class LinearActionConditionedJEPA:
         self.config = config
         self.context_dim, self.action_dim = context_dim, action_dim
         self.future_dim, self.security_dim = future_dim, security_dim
-        rng = np.random.default_rng(config.seed)
+        rng = _factor_rng(config, "initialization")
         scale = 1.0 / np.sqrt(config.latent_dim)
         self.W_context = rng.normal(0, scale, (context_dim, config.latent_dim))
         self.W_action = rng.normal(0, scale, (action_dim, config.latent_dim))
@@ -103,7 +121,7 @@ class LinearActionConditionedJEPA:
         n = len(xc)
         if not (len(xa) == len(yf) == len(ys) == n) or n < 2:
             raise ValueError("aligned arrays with at least two rows are required")
-        rng = np.random.default_rng(self.config.seed)
+        rng = _factor_rng(self.config, "minibatch_order")
         c = self.config
         for _ in range(c.epochs):
             order = rng.permutation(n)
@@ -202,7 +220,7 @@ class LinearActionConditionedSupervised:
             raise ValueError("all feature dimensions must be positive")
         self.config = config
         self.context_dim, self.action_dim, self.security_dim = context_dim, action_dim, security_dim
-        rng = np.random.default_rng(config.seed)
+        rng = _factor_rng(config, "initialization")
         scale = 1.0 / np.sqrt(config.latent_dim)
         self.W_context = rng.normal(0, scale, (context_dim, config.latent_dim))
         self.W_action = rng.normal(0, scale, (action_dim, config.latent_dim))
@@ -216,7 +234,7 @@ class LinearActionConditionedSupervised:
         ys = LinearActionConditionedJEPA._matrix(security_targets, "security_targets")
         if len(xc) != len(xa) or len(xc) != len(ys) or len(xc) < 2:
             raise ValueError("aligned arrays with at least two rows are required")
-        rng = np.random.default_rng(self.config.seed)
+        rng = _factor_rng(self.config, "minibatch_order")
         for _ in range(self.config.epochs):
             order = rng.permutation(len(xc))
             for start in range(0, len(xc), self.config.batch_size):

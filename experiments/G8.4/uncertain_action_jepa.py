@@ -111,6 +111,8 @@ def fit_e1_e2_models(
     dataset: dict[str, Any],
     seed: int,
     epochs: int = 180,
+    initialization_seed: int | None = None,
+    minibatch_order_seed: int | None = None,
 ) -> tuple[LinearActionConditionedJEPA, PastOnlySoftmaxPredictor, dict[str, Any]]:
     """Fit JEPA on train; fit past-only action head on train latents; calibrate separately."""
     train, validation, calibration = (dataset[k] for k in ("train", "validation", "calibration"))
@@ -125,6 +127,8 @@ def fit_e1_e2_models(
         latent_dim=12, learning_rate=0.008, epochs=epochs, batch_size=128,
         ema_tau=0.99, variance_floor=0.2, variance_weight=0.1,
         security_weight=0.5, seed=seed,
+        initialization_seed=initialization_seed,
+        minibatch_order_seed=minibatch_order_seed,
     )
     jepa = LinearActionConditionedJEPA(
         xc.shape[1], xa.shape[1], yf.shape[1], train["security"].shape[1], config

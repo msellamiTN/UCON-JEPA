@@ -1,0 +1,48 @@
+name: G8.4.8.7.9 Initialization-Minibatch Seed Decomposition
+
+on:
+  push:
+    branches:
+      - research/g8.4.8.7.9-init-minibatch-seed-implementation
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-7-9-init-minibatch-seed-decomposition.yml"
+  pull_request:
+    paths:
+      - "experiments/G8.4/**"
+      - ".github/workflows/g8-4-8-7-9-init-minibatch-seed-decomposition.yml"
+  workflow_dispatch:
+
+jobs:
+  init-minibatch-factorial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r experiments/G8.4/test-requirements.txt
+      - name: Run complete G8.4 regression suite
+        working-directory: experiments/G8.4
+        run: python -m unittest discover -v
+      - name: Run seed-factorization tests
+        working-directory: experiments/G8.4
+        run: python -m unittest -v test_seed_factorization.py
+      - name: Execute fully crossed 5x5x5 factorial benchmark
+        working-directory: experiments/G8.4
+        env:
+          UCON_JEPA_CODE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          python policy_shift_init_minibatch_factorial.py
+          --episodes-per-cell 300
+          --epochs 180
+          --mc-samples 32
+          --bootstrap-replicates 2000
+          --out init-minibatch-factorial-output
+      - name: Retain datasets, episode predictions and factorial results
+        uses: actions/upload-artifact@v4
+        with:
+          name: g8-4-8-7-9-init-minibatch-factorial
+          path: experiments/G8.4/init-minibatch-factorial-output/
