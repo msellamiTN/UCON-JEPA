@@ -782,7 +782,7 @@ def _run_matrix(
         }
     }
     (output_dir / "artifact_manifest.json").write_text(
-        json.dumps(artifact_manifest, indent=2) + "\\n", encoding="utf-8"
+        json.dumps(artifact_manifest, indent=2) + "\n", encoding="utf-8"
     )
     return result
 
