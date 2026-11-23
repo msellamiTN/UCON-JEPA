@@ -213,6 +213,14 @@ def run(out: Path, epochs: int, episodes: int, mc_samples: int, bootstrap_replic
                     supervised_shifted_raw=saved[("shifted", "supervised_E2")][0]["raw"],
                     jepa_shifted_calibrated=saved[("shifted", "JEPA_E2")][1],
                     supervised_shifted_calibrated=saved[("shifted", "supervised_E2")][1],
+                    reverse_episode_id=saved[("reverse", "JEPA_E2")][0]["episode_id"],
+                    reverse_truth=saved[("reverse", "JEPA_E2")][0]["truth"],
+                    reverse_policy=saved[("reverse", "JEPA_E2")][0]["agent_policy"],
+                    reverse_family=saved[("reverse", "JEPA_E2")][0]["family"],
+                    jepa_reverse_raw=saved[("reverse", "JEPA_E2")][0]["raw"],
+                    supervised_reverse_raw=saved[("reverse", "supervised_E2")][0]["raw"],
+                    jepa_reverse_calibrated=saved[("reverse", "JEPA_E2")][1],
+                    supervised_reverse_calibrated=saved[("reverse", "supervised_E2")][1],
                 )
                 cells[key] = {
                     "dataset_seed": ds,
