@@ -32,6 +32,8 @@ jobs:
         run: python -m unittest -v test_policy_shift_crossed_seed_initial_direction.py
       - name: Execute fully crossed 5x5 benchmark
         working-directory: experiments/G8.4
+        env:
+          UCON_JEPA_CODE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: >-
           python policy_shift_crossed_seed_initial_direction.py
           --dataset-seeds 20261120,20261121,20261122,20261123,20261124
