@@ -9,7 +9,7 @@ There is no EMA target encoder or JEPA latent-prediction objective.
 from __future__ import annotations
 
 import numpy as np
-from jepa_numpy import JEPAConfig, LinearActionConditionedJEPA
+from jepa_numpy import JEPAConfig, LinearActionConditionedJEPA, _factor_rng
 
 
 class LinearSupervisedStateDynamics:
