@@ -14,6 +14,7 @@ from policy_shift_crossed_seed_initial_direction import (
     _bootstrap_cell,
     _classify_direction,
     _fast_auc,
+    _group_metrics_safe,
     _legacy_rollout_seeds,
     _matrix_factor_summary,
     _position_zero,
@@ -215,6 +216,21 @@ class CrossedSeedInitialDirectionTests(unittest.TestCase):
             self.assertIn("calibration_slope_ci95", result["models"][model])
             self.assertIn("shifted_test_auroc_ci95", result["models"][model])
         self.assertIn("shifted_test_raw_brier_ci95", result["paired_JEPA_minus_supervised"])
+        self.assertIn("calibration_slope_ci95", result["paired_JEPA_minus_supervised"])
+        self.assertIn("shifted_test_raw_auroc_ci95", result["paired_JEPA_minus_supervised"])
+
+    def test_group_metrics_marks_one_class_cells_unavailable(self):
+        part = {
+            "agent_policy": np.asarray(["goal", "goal", "retry", "retry"]),
+            "family": np.asarray(["iam", "iam", "data", "data"]),
+            "truth": np.asarray([0, 1, 1, 1]),
+            "raw": np.asarray([0.2, 0.8, 0.7, 0.9]),
+        }
+        calibrated = np.asarray([0.3, 0.7, 0.6, 0.8])
+        result = _group_metrics_safe(part, calibrated)
+        self.assertTrue(result["goal"]["iam"]["available"])
+        self.assertFalse(result["retry"]["data"]["available"])
+        self.assertIn("only one class", result["retry"]["data"]["reason"])
 
     def test_diagonal_reference_has_complete_seed_model_coverage(self):
         path = Path(__file__).parent / "references" / "g8_4_8_7_7_diagonal_position0_reference.json"
