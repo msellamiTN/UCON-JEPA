@@ -21,6 +21,7 @@ from policy_shift_crossed_seed_initial_direction import (
     _sample_stratified_indices,
     _score_summary,
     _strata_indices,
+    _strata_episode_counts,
 )
 
 
@@ -72,6 +73,19 @@ class CrossedSeedInitialDirectionTests(unittest.TestCase):
             sorted((policies[sampled] == "goal").sum() for _ in range(1)),
             [4],
         )
+
+    def test_missing_policy_family_class_is_explicit_in_bootstrap_counts(self):
+        part = {
+            "episode_id": np.asarray(["a", "b", "c"]),
+            "agent_policy": np.asarray(["goal", "goal", "retry"]),
+            "family": np.asarray(["iam", "iam", "data"]),
+            "truth": np.asarray([0, 1, 1]),
+        }
+        counts = _strata_episode_counts(part)
+        self.assertEqual(counts["goal/iam/label=0"], 1)
+        self.assertEqual(counts["goal/iam/label=1"], 1)
+        self.assertEqual(counts["retry/data/label=0"], 0)
+        self.assertEqual(counts["retry/data/label=1"], 1)
 
     def test_direction_classification_requires_all_four_intervals(self):
         positive = {
