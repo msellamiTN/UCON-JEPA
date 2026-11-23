@@ -275,7 +275,7 @@ def _classify_direction(
 
 
 def _matrix_factor_summary(
-    values: dict[str, dict[str, float]],
+    values: dict[str, float],
     dataset_seeds: tuple[int, ...],
     model_seeds: tuple[int, ...],
 ) -> dict[str, Any]:
