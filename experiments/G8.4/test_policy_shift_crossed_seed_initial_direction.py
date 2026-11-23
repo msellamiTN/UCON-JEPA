@@ -49,7 +49,7 @@ class CrossedSeedInitialDirectionTests(unittest.TestCase):
     def test_fast_auc_matches_rank_metric_with_ties(self):
         labels = np.asarray([0, 1, 0, 1, 1, 0, 1, 0])
         scores = np.asarray([0.1, 0.8, 0.4, 0.4, 0.8, 0.1, 0.2, 0.4])
-        expected = 0.5
+        expected = 0.8125
         self.assertAlmostEqual(_fast_auc(labels, scores), expected, places=14)
 
     def test_stratified_bootstrap_preserves_policy_family_label_counts(self):
