@@ -794,7 +794,7 @@ def _run_matrix(
 
     result = {
         "benchmark": "G8.4.8.7.8 crossed-seed initial-position direction audit",
-        "code_sha": os.environ.get("GITHUB_SHA"),
+        "code_sha": os.environ.get("UCON_JEPA_CODE_SHA"),
         "dataset_seeds": list(dataset_seeds),
         "model_training_seeds": list(model_seeds),
         "cells": cells,
