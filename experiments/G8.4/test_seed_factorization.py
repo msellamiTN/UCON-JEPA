@@ -50,7 +50,7 @@ class FactorSeparatedRandomnessTests(unittest.TestCase):
         self.assertFalse(np.array_equal(init_values, order_values))
 
     def test_legacy_seed_path_preserves_original_initialization_stream(self):
-        config = JEPAConfig(seed=404)
+        config = JEPAConfig(seed=404, latent_dim=4)
         model = LinearActionConditionedJEPA(3, 2, 3, 2, config)
         rng = np.random.default_rng(404)
         scale = 1.0 / np.sqrt(config.latent_dim)
@@ -58,6 +58,15 @@ class FactorSeparatedRandomnessTests(unittest.TestCase):
         np.testing.assert_array_equal(model.W_action, rng.normal(0, scale, (2, 4)))
         np.testing.assert_array_equal(model.W_predictor, rng.normal(0, scale, (8, 4)))
         np.testing.assert_array_equal(model.W_decoder, rng.normal(0, scale, (4, 2)))
+
+    def test_legacy_minibatch_order_stream_is_unchanged(self):
+        config = JEPAConfig(seed=505, latent_dim=4, epochs=2)
+        rng = np.random.default_rng(505)
+        expected = [rng.permutation(17) for _ in range(config.epochs)]
+        actual_rng = _factor_rng(config, "minibatch_order")
+        actual = [actual_rng.permutation(17) for _ in range(config.epochs)]
+        for got, want in zip(actual, expected):
+            np.testing.assert_array_equal(got, want)
 
     def test_partial_factor_seed_configuration_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "must be supplied together"):
