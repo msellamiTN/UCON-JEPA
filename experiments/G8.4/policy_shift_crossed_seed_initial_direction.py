@@ -7,7 +7,9 @@ randomness fixed across the full matrix and both models.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -722,6 +724,7 @@ def _run_matrix(
 
     result = {
         "benchmark": "G8.4.8.7.8 crossed-seed initial-position direction audit",
+        "code_sha": os.environ.get("GITHUB_SHA"),
         "dataset_seeds": list(dataset_seeds),
         "model_training_seeds": list(model_seeds),
         "cells": cells,
@@ -764,6 +767,22 @@ def _run_matrix(
     )
     (output_dir / "diagonal_reference.json").write_text(
         reference_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    artifact_files = sorted(
+        path for path in output_dir.rglob("*")
+        if path.is_file() and path.name != "artifact_manifest.json"
+    )
+    artifact_manifest = {
+        "files": {
+            str(path.relative_to(output_dir)): {
+                "bytes": int(path.stat().st_size),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+            for path in artifact_files
+        }
+    }
+    (output_dir / "artifact_manifest.json").write_text(
+        json.dumps(artifact_manifest, indent=2) + "\\n", encoding="utf-8"
     )
     return result
 
